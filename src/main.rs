@@ -16,9 +16,9 @@ struct Cli {
     finish_command: String,
 }
 
-use chrono::{serde::ts_seconds, DateTime, NaiveDateTime, Utc};
+use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 // Defining the Session struct in Rust
 #[derive(Serialize, Deserialize, Debug)]
@@ -29,21 +29,28 @@ struct Session {
     start: DateTime<Utc>,
 }
 
+struct SessionService;
+
+impl SessionService {
+    fn start_session(&self, description: &str, duration_seconds: u64) -> Session {
+        let start = SystemTime::now();
+        let datetime: DateTime<Utc> = start.into();
+
+        Session {
+            description: description.to_string(),
+            duration: Duration::new(duration_seconds, 0),
+            start: datetime,
+        }
+    }
+}
+
 fn main() {
     let args = Cli::from_args();
     println!("Duration: {} minutes", args.duration);
     println!("Description: {}", args.description);
     println!("Finish Command: {}", args.finish_command);
 
-    let naive_datetime =
-        NaiveDateTime::parse_from_str("2023-10-10 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-    let start: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
-
-    let test_session = Session {
-        description: String::from("Example session"),
-        duration: Duration::new(3600, 0), // 1 hour in seconds
-        start,
-    };
-
-    println!("{:?}", test_session);
+    let session_service = SessionService;
+    let session = session_service.start_session("New session", 3600);
+    println!("{:?}", session);
 }

@@ -9,7 +9,7 @@ use structopt::StructOpt;
 struct Cli {
     /// Duration in minutes
     #[structopt(short = "t", long = "duration", default_value = "25")]
-    duration: i32,
+    duration: u64,
 
     /// Description of this session
     #[structopt(short = "d", long = "description", default_value = "no description")]
@@ -27,6 +27,6 @@ fn main() {
     println!("Finish Command: {}", args.finish_command);
 
     let session_service = SessionService;
-    let session = session_service.start_session("New session", 3600);
+    let session = session_service.start_session(&args.description, args.duration * 60);
     println!("{:?}", session);
 }

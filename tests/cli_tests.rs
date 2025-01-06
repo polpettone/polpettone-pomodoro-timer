@@ -6,6 +6,7 @@ fn test_cli_output() {
     let output = Command::new("cargo")
         .arg("run")
         .arg("--")
+        .arg("start") // Hinzufügen des "start" Kommandos
         .arg("--duration")
         .arg("30")
         .arg("--description")

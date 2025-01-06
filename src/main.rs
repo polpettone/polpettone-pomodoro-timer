@@ -19,18 +19,23 @@ struct Config {
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
-struct Cli {
-    /// Duration in minutes
-    #[structopt(short = "t", long = "duration", default_value = "25")]
-    duration: u64,
+enum Command {
+    /// Start a new session
+    Start {
+        /// Duration in minutes
+        #[structopt(short = "t", long = "duration", default_value = "25")]
+        duration: u64,
 
-    /// Description of this session
-    #[structopt(short = "d", long = "description", default_value = "no description")]
-    description: String,
+        /// Description of this session
+        #[structopt(short = "d", long = "description", default_value = "no description")]
+        description: String,
 
-    /// Command to execute when session finished
-    #[structopt(short = "f", long = "finishCommand", default_value = "i3lock")]
-    finish_command: String,
+        /// Command to execute when session finished
+        #[structopt(short = "f", long = "finishCommand", default_value = "i3lock")]
+        finish_command: String,
+    },
+    /// Show all sessions
+    Show,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -50,25 +55,41 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let args = Cli::from_args();
-    println!("Duration: {} minutes", args.duration);
-    println!("Description: {}", args.description);
-    println!("Finish Command: {}", args.finish_command);
-
     let session_service = SessionService {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
     };
-    session_service.start_session(&args.description, args.duration * 60)?;
 
-    match session_service.load_sessions() {
-        Ok(sessions) => {
-            for session in sessions {
-                println!("{:?}", session);
+    let command = Command::from_args();
+    match command {
+        Command::Start {
+            duration,
+            description,
+            finish_command,
+        } => {
+            println!("Starting session: {} for {} minutes", description, duration);
+
+            println!("Duration: {} minutes", duration);
+            println!("Description: {}", description);
+            println!("Finish Command: {}", finish_command);
+
+            session_service.start_session(&description, duration * 60)?;
+            // Call start_session here
+        }
+        Command::Show => {
+            println!("Showing all sessions");
+
+            match session_service.load_sessions() {
+                Ok(sessions) => {
+                    for session in sessions {
+                        println!("{:?}", session);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading sessions: {}", e);
+                }
             }
         }
-        Err(e) => {
-            eprintln!("Error loading sessions: {}", e);
-        }
     }
+
     Ok(())
 }

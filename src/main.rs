@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let session_service = SessionService {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
     };
-    session_service.start_session(&args.description, args.duration * 60);
+    session_service.start_session(&args.description, args.duration * 60)?;
 
     Ok(())
 }

@@ -2,6 +2,7 @@ use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
+use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -19,7 +20,11 @@ pub struct SessionService {
 }
 
 impl SessionService {
-    pub fn start_session(&self, description: &str, duration_seconds: u64) {
+    pub fn start_session(
+        &self,
+        description: &str,
+        duration_seconds: u64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let start = SystemTime::now();
         let start_date: DateTime<Utc> = start.into();
 
@@ -33,16 +38,21 @@ impl SessionService {
             start: start_date,
         };
 
-        serialize_session(session, session_dir.to_string(), start_date);
+        serialize_session(&session, session_dir, start_date)?;
+        Ok(())
     }
 }
 
-fn serialize_session(session: Session, session_dir: String, start_date: DateTime<Utc>) {
+fn serialize_session(
+    session: &Session,
+    session_dir: &str,
+    start_date: DateTime<Utc>,
+) -> Result<(), Box<dyn Error>> {
     let filename = format!("{}-session.yaml", start_date.format("%Y%m%d%H%M%S"));
-    let filepath = Path::new(&session_dir).join(filename);
+    let filepath = Path::new(session_dir).join(filename);
 
-    let serialized = serde_yaml::to_string(&session).expect("Failed to serialize session");
-    let mut file = File::create(filepath).expect("Failed to create file");
-    file.write_all(serialized.as_bytes())
-        .expect("Failed to write to file");
+    let serialized = serde_yaml::to_string(&session)?;
+    let mut file = File::create(filepath)?;
+    file.write_all(serialized.as_bytes())?;
+    Ok(())
 }

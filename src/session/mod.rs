@@ -10,12 +10,16 @@ pub struct Session {
     start: DateTime<Utc>,
 }
 
-pub struct SessionService;
+pub struct SessionService {
+    pub pomodoro_session_dir: String,
+}
 
 impl SessionService {
     pub fn start_session(&self, description: &str, duration_seconds: u64) -> Session {
         let start = SystemTime::now();
         let datetime: DateTime<Utc> = start.into();
+
+        println!("Using {}", &self.pomodoro_session_dir);
 
         Session {
             description: description.to_string(),

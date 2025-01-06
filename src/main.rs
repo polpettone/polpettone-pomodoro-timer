@@ -60,5 +60,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     session_service.start_session(&args.description, args.duration * 60)?;
 
+    match session_service.load_sessions() {
+        Ok(sessions) => {
+            for session in sessions {
+                println!("{:?}", session);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error loading sessions: {}", e);
+        }
+    }
     Ok(())
 }

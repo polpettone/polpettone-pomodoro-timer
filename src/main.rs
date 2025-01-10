@@ -1,24 +1,15 @@
+mod config;
 mod session;
 mod view;
 
+use crate::config::Config;
 use crate::session::SessionService;
 use crate::view::Counter;
 
-use serde::Deserialize;
 use structopt::StructOpt;
 
 use std::error::Error;
 use std::fs;
-
-#[derive(Debug, Deserialize)]
-pub struct PomodoroConfig {
-    pub pomodoro_session_dir: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    pomodoro_config: PomodoroConfig,
-}
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]

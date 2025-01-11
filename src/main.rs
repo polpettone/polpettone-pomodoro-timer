@@ -1,10 +1,8 @@
 mod config;
 mod session;
-mod view;
 
 use crate::config::Config;
 use crate::session::SessionService;
-use crate::view::Counter;
 
 use structopt::StructOpt;
 
@@ -30,7 +28,6 @@ enum Command {
     },
     /// Show all sessions
     Show,
-    View,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -84,7 +81,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        Command::View => iced::run("A cool counter", Counter::update, Counter::view)?,
     }
 
     Ok(())

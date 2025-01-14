@@ -57,8 +57,17 @@ impl SessionService {
                 sessions.push(session);
             }
         }
-
         Ok(sessions)
+    }
+
+    pub fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
+        let sessions = self.load_sessions()?;
+        let now = Utc::now();
+        let active_sessions = sessions
+            .into_iter()
+            .filter(|session| session.start + session.duration > now)
+            .collect();
+        Ok(active_sessions)
     }
 }
 

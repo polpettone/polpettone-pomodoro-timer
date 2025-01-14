@@ -28,6 +28,7 @@ enum Command {
     },
     /// Show all sessions
     Show,
+    Active,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -70,6 +71,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Showing all sessions");
 
             match session_service.load_sessions() {
+                Ok(sessions) => {
+                    for session in sessions {
+                        println!("{:?}", session);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading sessions: {}", e);
+                }
+            }
+        }
+        Command::Active => {
+            println!("Showing all sessions");
+            match session_service.find_all_active_sessions() {
                 Ok(sessions) => {
                     for session in sessions {
                         println!("{:?}", session);

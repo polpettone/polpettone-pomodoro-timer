@@ -65,7 +65,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Finish Command: {}", finish_command);
 
             session_service.start_session(&description, duration * 60)?;
-            // Call start_session here
         }
         Command::Show => {
             println!("Showing all sessions");

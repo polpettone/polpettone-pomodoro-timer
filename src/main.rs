@@ -7,10 +7,19 @@ use crate::session::SessionService;
 use structopt::StructOpt;
 
 use std::error::Error;
-use std::fs;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
+struct Opts {
+    /// Optional configuration file
+    #[structopt(short = "c", long = "config", default_value = "config.toml")]
+    config: String,
+
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(StructOpt, Debug)]
 enum Command {
     /// Start a new session
     Start {
@@ -32,14 +41,9 @@ enum Command {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let config_string = match fs::read_to_string("config.toml") {
-        Ok(content) => content,
-        Err(e) => {
-            println!("Error reading configuration file: {}", e);
-            return Err(Box::new(e));
-        }
-    };
+    let opts = Opts::from_args();
 
+    let config_string = std::fs::read_to_string(&opts.config)?;
     let config: Config = match toml::from_str(&config_string) {
         Ok(cfg) => cfg,
         Err(e) => {
@@ -52,8 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
     };
 
-    let command = Command::from_args();
-    match command {
+    match opts.cmd {
         Command::Start {
             duration,
             description,

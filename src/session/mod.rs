@@ -1,14 +1,16 @@
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+mod date_time;
+
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use std::error::Error;
-use std::fmt;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
+use crate::session::date_time::{deserialize_human_readable, serialize_human_readable};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
@@ -88,38 +90,4 @@ fn serialize_session(
     let mut file = File::create(filepath)?;
     file.write_all(serialized.as_bytes())?;
     Ok(())
-}
-
-fn serialize_human_readable<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let s = date.format("%Y-%m-%d %H:%M:%S").to_string();
-    serializer.serialize_str(&s)
-}
-
-struct DateTimeVisitor;
-
-impl<'de> Visitor<'de> for DateTimeVisitor {
-    type Value = DateTime<Utc>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string representing a date and time in the format %Y-%m-%d %H:%M:%S")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S")
-            .map(|naive| Utc.from_utc_datetime(&naive))
-            .map_err(de::Error::custom)
-    }
-}
-
-fn deserialize_human_readable<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserializer.deserialize_str(DateTimeVisitor)
 }

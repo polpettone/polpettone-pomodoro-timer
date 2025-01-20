@@ -30,10 +30,6 @@ enum Command {
         /// Description of this session
         #[structopt(short = "d", long = "description", default_value = "no description")]
         description: String,
-
-        /// Command to execute when session finished
-        #[structopt(short = "f", long = "finishCommand", default_value = "i3lock")]
-        finish_command: String,
     },
     /// Show all sessions
     Show,
@@ -60,13 +56,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Start {
             duration,
             description,
-            finish_command,
         } => {
             println!("Starting session: {} for {} minutes", description, duration);
 
             println!("Duration: {} minutes", duration);
             println!("Description: {}", description);
-            println!("Finish Command: {}", finish_command);
 
             session_service.start_session(&description, duration * 60)?;
         }

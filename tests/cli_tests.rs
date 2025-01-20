@@ -19,12 +19,10 @@ fn test_cli_output() {
         session_dir.display()
     );
 
-    let config_path = "/tmp/pomodoro/config.toml";
-    fs::create_dir_all(Path::new(config_path).parent().unwrap())
-        .expect("Failed to create config directory");
+    let config_path = temp_dir.path().join("pomodoro").join("config.toml");
+    fs::create_dir_all(config_path.parent().unwrap()).expect("Failed to create config directory");
+    fs::write(config_path.clone(), config_content).expect("Failed to write config");
 
-    fs::write(config_path, config_content).expect("Failed to write config");
-    // Konfigurieren Sie den Prozess
     let output = Command::new("cargo")
         .arg("run")
         .arg("--")

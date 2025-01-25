@@ -7,6 +7,7 @@ use crate::session::SessionService;
 use structopt::StructOpt;
 
 use std::error::Error;
+use std::{thread, time::Duration};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -92,21 +93,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        Command::Watch => match session_service.find_all_active_sessions() {
-            Ok(sessions) => {
-                for session in sessions {
-                    println!(
-                        "{}, {}, {}, {}",
-                        session.description,
-                        session.start,
-                        session.duration.as_secs(),
-                        session.elapsed_duration().as_secs()
-                    )
+
+        Command::Watch => loop {
+            match session_service.find_all_active_sessions() {
+                Ok(sessions) => {
+                    const ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE: &str = "\x1B[2J\x1B[1;1H";
+                    print!("{}", ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE);
+                    for session in sessions {
+                        println!(
+                            "{}, {}, {}, {}",
+                            session.description,
+                            session.start,
+                            session.duration.as_secs(),
+                            session.elapsed_duration().as_secs()
+                        )
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loadings sessions: {}", e)
                 }
             }
-            Err(e) => {
-                eprintln!("Error loadings sessions: {}", e)
-            }
+            thread::sleep(Duration::from_secs(1));
         },
     }
 

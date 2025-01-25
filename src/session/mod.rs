@@ -14,13 +14,19 @@ use crate::session::date_time::{deserialize_human_readable, serialize_human_read
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
-    description: String,
-    duration: Duration,
+    pub description: String,
+    pub duration: Duration,
     #[serde(
         serialize_with = "serialize_human_readable",
         deserialize_with = "deserialize_human_readable"
     )]
-    start: DateTime<Utc>,
+    pub start: DateTime<Utc>,
+}
+
+impl Session {
+    pub fn elapsed_duration(&self) -> Duration {
+        return Duration::new(12, 0);
+    }
 }
 
 pub struct SessionService {

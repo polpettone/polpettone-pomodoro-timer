@@ -34,6 +34,7 @@ enum Command {
     /// Show all sessions
     Show,
     Active,
+    Watch,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -91,6 +92,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+        Command::Watch => match session_service.find_all_active_sessions() {
+            Ok(sessions) => {
+                for session in sessions {
+                    println!(
+                        "{}, {}, {}, {}",
+                        session.description,
+                        session.start,
+                        session.duration.as_secs(),
+                        session.elapsed_duration().as_secs()
+                    )
+                }
+            }
+            Err(e) => {
+                eprintln!("Error loadings sessions: {}", e)
+            }
+        },
     }
 
     Ok(())

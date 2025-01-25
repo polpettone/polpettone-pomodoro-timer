@@ -25,7 +25,12 @@ pub struct Session {
 
 impl Session {
     pub fn elapsed_duration(&self) -> Duration {
-        return Duration::new(12, 0);
+        let now = Utc::now();
+        let duration_since_start = now.signed_duration_since(self.start);
+        Duration::new(
+            duration_since_start.num_seconds() as u64,
+            duration_since_start.num_nanoseconds().unwrap_or(0) as u32,
+        )
     }
 }
 

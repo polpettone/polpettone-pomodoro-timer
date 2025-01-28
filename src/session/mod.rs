@@ -87,6 +87,22 @@ impl SessionService {
             .collect();
         Ok(active_sessions)
     }
+
+    pub fn find_sessions_in_range(
+        &self,
+        range_start: DateTime<Utc>,
+        range_end: DateTime<Utc>,
+    ) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
+        let sessions = self.load_sessions()?;
+        let sessions_in_range = sessions
+            .into_iter()
+            .filter(|session| {
+                let session_end = session.start + session.duration;
+                session.start < range_end && session_end > range_start
+            })
+            .collect();
+        Ok(sessions_in_range)
+    }
 }
 
 fn serialize_session(

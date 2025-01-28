@@ -36,6 +36,10 @@ enum Command {
     Show,
     Active,
     Watch,
+    FindSessionsInRange {
+        start_date: String,
+        end_date: String,
+    },
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -115,6 +119,40 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             thread::sleep(Duration::from_secs(1));
         },
+
+        Command::FindSessionsInRange {
+            start_date,
+            end_date,
+        } => {
+            use chrono::prelude::*;
+            use std::str::FromStr;
+
+            let parsed_start = DateTime::from_str(&start_date);
+            let parsed_end = DateTime::from_str(&end_date);
+
+            match (parsed_start, parsed_end) {
+                (Ok(start), Ok(end)) => {
+                    match session_service.find_sessions_in_range(start, end) {
+                        Ok(sessions) => {
+                            println!("Found {} sessions in range:", sessions.len());
+                            for session in sessions {
+                                println!("{:?}", session); // Annahme: Debug-Formatierung der Session-Ausgabe
+                            }
+                        }
+                        Err(err) => println!("Error finding sessions: {}", err),
+                    }
+                }
+                (Err(e1), Err(e2)) => {
+                    println!("Failed to parse dates: {} and {}", e1, e2);
+                }
+                (Err(e), _) => {
+                    println!("Failed to parse start date: {}", e);
+                }
+                (_, Err(e)) => {
+                    println!("Failed to parse end date: {}", e);
+                }
+            }
+        }
     }
 
     Ok(())

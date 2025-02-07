@@ -11,6 +11,8 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::session::date_time::{deserialize_human_readable, serialize_human_readable};
+use std::fs::OpenOptions;
+use std::io;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
@@ -86,6 +88,25 @@ impl SessionService {
             .filter(|session| session.start + session.duration > now)
             .collect();
         Ok(active_sessions)
+    }
+
+    pub fn update_pomodoro_status(&self, path_to_status_file: String) -> Result<(), io::Error> {
+        if let Ok(sessions) = self.find_all_active_sessions() {
+            if let Some(session) = sessions.get(0) {
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(path_to_status_file)?;
+
+                writeln!(
+                    file,
+                    "{} - {}",
+                    session.description,
+                    session.elapsed_duration().as_secs(),
+                )?;
+            }
+        }
+        Ok(())
     }
 
     pub fn find_sessions_in_range(

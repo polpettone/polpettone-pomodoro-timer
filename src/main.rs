@@ -107,6 +107,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Watch => loop {
             match session_service.find_all_active_sessions() {
                 Ok(sessions) => {
+                    session_service.update_pomodoro_status(
+                        "/home/kenny/pomodoro/pomodoro-status".to_string(),
+                    )?;
                     const ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE: &str = "\x1B[2J\x1B[1;1H";
                     print!("{}", ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE);
                     for session in sessions {

@@ -2,12 +2,19 @@ mod config;
 mod session;
 
 use crate::config::Config;
+
+use crate::session::Session;
 use crate::session::SessionService;
+use dialoguer::Select;
+
+use std::time::Duration;
 
 use structopt::StructOpt;
 
+use comfy_table::{Attribute, Cell, ContentArrangement, Table};
+use std::thread;
+
 use std::error::Error;
-use std::{thread, time::Duration};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -75,9 +82,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match session_service.load_sessions() {
                 Ok(sessions) => {
-                    for session in sessions {
-                        println!("{:?}", session);
-                    }
+                    print_table(sessions)?;
+                    select_options();
                 }
                 Err(e) => {
                     eprintln!("Error loading sessions: {}", e);
@@ -156,4 +162,40 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn print_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
+    let mut table = Table::new();
+    table
+        .set_header(vec![
+            Cell::new("Description").add_attribute(Attribute::Bold),
+            Cell::new("Duration").add_attribute(Attribute::Bold),
+            Cell::new("Start Time").add_attribute(Attribute::Bold),
+        ])
+        .set_content_arrangement(ContentArrangement::Dynamic);
+
+    for session in sessions {
+        table.add_row(vec![
+            Cell::new(session.description),
+            Cell::new(format!("{:?}", session.duration)), // Format duration as needed
+            Cell::new(session.start.format("%Y-%m-%d %H:%M:%S").to_string()),
+        ]);
+    }
+
+    println!("{}", table);
+
+    Ok(())
+}
+
+fn select_options() {
+    let options = &["Session 1", "Session 2", "Session 3"];
+
+    let selection = Select::new()
+        .with_prompt("Select your session")
+        .default(0)
+        .items(&options[..])
+        .interact()
+        .unwrap();
+
+    println!("You selected: {}", options[selection]);
 }

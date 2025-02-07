@@ -1,5 +1,3 @@
-mod date_time;
-
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
@@ -10,7 +8,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use crate::session::date_time::{deserialize_human_readable, serialize_human_readable};
+use crate::date_time::{deserialize_human_readable, duration_in_minutes, serialize_human_readable};
 use std::fs::OpenOptions;
 use std::io;
 
@@ -100,9 +98,10 @@ impl SessionService {
 
                 writeln!(
                     file,
-                    "{} - {}",
+                    "{} - {}/{}",
                     session.description,
-                    session.elapsed_duration().as_secs(),
+                    duration_in_minutes(session.duration),
+                    duration_in_minutes(session.elapsed_duration())
                 )?;
             }
         }

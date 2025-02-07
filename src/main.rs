@@ -1,4 +1,5 @@
 mod config;
+mod date_time;
 mod session;
 
 use crate::config::Config;
@@ -14,6 +15,7 @@ use structopt::StructOpt;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table};
 use std::thread;
 
+use date_time::duration_in_minutes;
 use std::error::Error;
 
 #[derive(StructOpt, Debug)]
@@ -180,7 +182,7 @@ fn print_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
     for session in sessions {
         table.add_row(vec![
             Cell::new(session.description),
-            Cell::new(format!("{:?}", session.duration)), // Format duration as needed
+            Cell::new(format!("{:?}", duration_in_minutes(session.duration))), // Format duration as needed
             Cell::new(session.start.format("%Y-%m-%d %H:%M:%S").to_string()),
         ]);
     }

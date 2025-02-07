@@ -2,6 +2,7 @@ use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde::de::{self, Visitor};
 use serde::{Deserializer, Serializer};
 use std::fmt;
+use std::time::Duration;
 
 pub fn serialize_human_readable<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -35,4 +36,11 @@ where
     D: Deserializer<'de>,
 {
     deserializer.deserialize_str(DateTimeVisitor)
+}
+
+pub fn duration_in_minutes(duration: Duration) -> String {
+    let seconds = duration.as_secs();
+    let minutes = seconds / 60;
+    let remaining_seconds = seconds % 60;
+    return format!("{}:{}", minutes, remaining_seconds);
 }

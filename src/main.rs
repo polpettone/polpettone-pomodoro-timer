@@ -1,8 +1,10 @@
+mod command;
 mod config;
 mod date_time;
 mod session;
 
 use crate::config::Config;
+use command::Command;
 
 use crate::session::Session;
 use crate::session::SessionService;
@@ -27,28 +29,6 @@ struct Opts {
 
     #[structopt(subcommand)]
     cmd: Command,
-}
-
-#[derive(StructOpt, Debug)]
-enum Command {
-    /// Start a new session
-    Start {
-        /// Duration in minutes
-        #[structopt(short = "t", long = "duration", default_value = "25")]
-        duration: u64,
-
-        /// Description of this session
-        #[structopt(short = "d", long = "description", default_value = "no description")]
-        description: String,
-    },
-    /// Show all sessions
-    Show,
-    Active,
-    Watch,
-    FindSessionsInRange {
-        start_date: String,
-        end_date: String,
-    },
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

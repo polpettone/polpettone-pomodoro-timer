@@ -95,12 +95,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                     const ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE: &str = "\x1B[2J\x1B[1;1H";
                     print!("{}", ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE);
                     for session in sessions {
+                        let duration_secs = session.duration.as_secs();
+                        let duration_mins = duration_secs / 60;
+                        let duration_remaining_secs = duration_secs % 60;
+
+                        let elapsed_secs = session.elapsed_duration().as_secs();
+                        let elapsed_mins = elapsed_secs / 60;
+                        let elapsed_remaining_secs = elapsed_secs % 60;
+
                         println!(
-                            "{}, {}, {}, {}",
+                            "{}, {}, {}:{:02}, {}:{:02}",
                             session.description,
                             session.start,
-                            session.duration.as_secs(),
-                            session.elapsed_duration().as_secs()
+                            duration_mins,
+                            duration_remaining_secs,
+                            elapsed_mins,
+                            elapsed_remaining_secs
                         )
                     }
                 }

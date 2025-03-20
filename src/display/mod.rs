@@ -28,7 +28,7 @@ pub fn print_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn export_sessions(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
+pub fn export_to_ascii_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
     // Sortiere Sessions nach Startzeit
     let mut sorted_sessions = sessions;
     sorted_sessions.sort_by(|a, b| a.start.cmp(&b.start));

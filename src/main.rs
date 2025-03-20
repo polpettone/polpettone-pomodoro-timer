@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     match session_service.find_sessions_in_range(start, end, search_query) {
                         Ok(sessions) => {
                             if export {
-                                display::export_sessions(sessions)?;
+                                display::export_to_ascii_table(sessions)?;
                             } else {
                                 display::print_table(sessions)?;
                             }
@@ -150,7 +150,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
                     if export {
-                        display::export_sessions(sessions)?;
+                        display::export_to_ascii_table(sessions)?;
                     } else {
                         display::print_table(sessions)?;
                     }
@@ -179,7 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
                     if export {
-                        display::export_sessions(sessions)?;
+                        display::export_to_ascii_table(sessions)?;
                     } else {
                         display::print_table(sessions)?;
                     }

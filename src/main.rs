@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             session_service.start_session(&description, duration * 60)?;
         }
-        Command::Show => {
+        Command::Show { search_query } => {
             println!("Showing all sessions");
 
             match session_service.load_sessions() {
@@ -125,6 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::FindSessionsInRange {
             start_date,
             end_date,
+            search_query,
         } => {
             use chrono::prelude::*;
             use std::str::FromStr;
@@ -134,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match (parsed_start, parsed_end) {
                 (Ok(start), Ok(end)) => {
-                    match session_service.find_sessions_in_range(start, end, None) {
+                    match session_service.find_sessions_in_range(start, end, search_query) {
                         Ok(sessions) => {
                             if let Err(e) = print_table(sessions) {
                                 println!("Error printing table: {}", e);
@@ -154,13 +155,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        Command::FindSessionFromToday => {
+        Command::FindSessionFromToday { search_query } => {
             use chrono::prelude::*;
             let now = Utc::now();
             let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
             let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-            match session_service.find_sessions_in_range(start, end, None) {
+            match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
                     if let Err(e) = print_table(sessions) {
                         println!("Error printing table: {}", e);
@@ -169,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Err(err) => println!("Error finding sessions: {}", err),
             }
         }
-        Command::FindSessionFromYesterday => {
+        Command::FindSessionFromYesterday { search_query } => {
             use chrono::prelude::*;
             let now = Utc::now();
             let yesterday = (now - chrono::Duration::days(1)).date_naive();
@@ -184,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .and_local_timezone(Utc)
                 .unwrap();
 
-            match session_service.find_sessions_in_range(start, end, None) {
+            match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
                     if let Err(e) = print_table(sessions) {
                         println!("Error printing table: {}", e);

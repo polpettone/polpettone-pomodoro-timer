@@ -2,7 +2,8 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
-    /// Start a new session
+    Active,
+    Watch,
     Start {
         /// Duration in minutes
         #[structopt(short = "t", long = "duration", default_value = "25")]
@@ -12,14 +13,22 @@ pub enum Command {
         #[structopt(short = "d", long = "description", default_value = "no description")]
         description: String,
     },
-    /// Show all sessions
-    Show,
-    Active,
-    Watch,
-    FindSessionFromToday,
-    FindSessionFromYesterday,
+    Show {
+        #[structopt(short = "s", long = "search")]
+        search_query: Option<String>,
+    },
+    FindSessionFromToday {
+        #[structopt(short = "s", long = "search")]
+        search_query: Option<String>,
+    },
+    FindSessionFromYesterday {
+        #[structopt(short = "s", long = "search")]
+        search_query: Option<String>,
+    },
     FindSessionsInRange {
         start_date: String,
         end_date: String,
+        #[structopt(short = "s", long = "search")]
+        search_query: Option<String>,
     },
 }

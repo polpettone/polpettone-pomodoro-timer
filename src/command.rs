@@ -16,6 +16,8 @@ pub enum Command {
     Show,
     Active,
     Watch,
+    FindSessionFromToday,
+    FindSessionFromYesterday,
     FindSessionsInRange {
         start_date: String,
         end_date: String,

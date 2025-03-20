@@ -154,6 +154,39 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+        Command::FindSessionFromToday => {
+            use chrono::prelude::*;
+            let now = Utc::now();
+            let start = now.date().and_hms(0, 0, 0);
+            let end = now.date().and_hms(23, 59, 59);
+
+            match session_service.find_sessions_in_range(start, end) {
+                Ok(sessions) => {
+                    println!("Found {} sessions today:", sessions.len());
+                    for session in sessions {
+                        println!("{:?}", session);
+                    }
+                }
+                Err(err) => println!("Error finding sessions: {}", err),
+            }
+        }
+        Command::FindSessionFromYesterday => {
+            use chrono::prelude::*;
+            let now = Utc::now();
+            let yesterday = now.date().pred();
+            let start = yesterday.and_hms(0, 0, 0);
+            let end = yesterday.and_hms(23, 59, 59);
+
+            match session_service.find_sessions_in_range(start, end) {
+                Ok(sessions) => {
+                    println!("Found {} sessions yesterday:", sessions.len());
+                    for session in sessions {
+                        println!("{:?}", session);
+                    }
+                }
+                Err(err) => println!("Error finding sessions: {}", err),
+            }
+        }
     }
 
     Ok(())

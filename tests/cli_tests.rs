@@ -3,7 +3,6 @@ use std::process::Command;
 use std::fs;
 
 #[test]
-
 fn test_cli_output() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
     let session_dir = temp_dir.path().join("session");

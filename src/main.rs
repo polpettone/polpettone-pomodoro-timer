@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 mod command;
 mod config;
 mod date_time;
@@ -76,8 +77,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Showing all sessions");
             match session_service.find_all_active_sessions() {
                 Ok(sessions) => {
-                    for session in sessions {
-                        println!("{:?}", session);
+                    if let Err(e) = print_table(sessions) {
+                        println!("Error printing table: {}", e);
                     }
                 }
                 Err(e) => {
@@ -132,17 +133,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             let parsed_end = DateTime::from_str(&end_date);
 
             match (parsed_start, parsed_end) {
-                (Ok(start), Ok(end)) => {
-                    match session_service.find_sessions_in_range(start, end) {
-                        Ok(sessions) => {
-                            println!("Found {} sessions in range:", sessions.len());
-                            for session in sessions {
-                                println!("{:?}", session); // Annahme: Debug-Formatierung der Session-Ausgabe
-                            }
+                (Ok(start), Ok(end)) => match session_service.find_sessions_in_range(start, end) {
+                    Ok(sessions) => {
+                        if let Err(e) = print_table(sessions) {
+                            println!("Error printing table: {}", e);
                         }
-                        Err(err) => println!("Error finding sessions: {}", err),
                     }
-                }
+                    Err(err) => println!("Error finding sessions: {}", err),
+                },
                 (Err(e1), Err(e2)) => {
                     println!("Failed to parse dates: {} and {}", e1, e2);
                 }
@@ -162,9 +160,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match session_service.find_sessions_in_range(start, end) {
                 Ok(sessions) => {
-                    println!("Found {} sessions today:", sessions.len());
-                    for session in sessions {
-                        println!("{:?}", session);
+                    if let Err(e) = print_table(sessions) {
+                        println!("Error printing table: {}", e);
                     }
                 }
                 Err(err) => println!("Error finding sessions: {}", err),
@@ -187,9 +184,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match session_service.find_sessions_in_range(start, end) {
                 Ok(sessions) => {
-                    println!("Found {} sessions yesterday:", sessions.len());
-                    for session in sessions {
-                        println!("{:?}", session);
+                    if let Err(e) = print_table(sessions) {
+                        println!("Error printing table: {}", e);
                     }
                 }
                 Err(err) => println!("Error finding sessions: {}", err),

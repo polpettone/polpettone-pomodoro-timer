@@ -157,8 +157,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::FindSessionFromToday => {
             use chrono::prelude::*;
             let now = Utc::now();
-            let start = now.date().and_hms(0, 0, 0);
-            let end = now.date().and_hms(23, 59, 59);
+            let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+            let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
             match session_service.find_sessions_in_range(start, end) {
                 Ok(sessions) => {
@@ -173,9 +173,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::FindSessionFromYesterday => {
             use chrono::prelude::*;
             let now = Utc::now();
-            let yesterday = now.date().pred();
-            let start = yesterday.and_hms(0, 0, 0);
-            let end = yesterday.and_hms(23, 59, 59);
+            let yesterday = (now - chrono::Duration::days(1)).date_naive();
+            let start = yesterday
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_local_timezone(Utc)
+                .unwrap();
+            let end = yesterday
+                .and_hms_opt(23, 59, 59)
+                .unwrap()
+                .and_local_timezone(Utc)
+                .unwrap();
 
             match session_service.find_sessions_in_range(start, end) {
                 Ok(sessions) => {

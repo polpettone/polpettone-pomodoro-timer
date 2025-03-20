@@ -133,14 +133,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let parsed_end = DateTime::from_str(&end_date);
 
             match (parsed_start, parsed_end) {
-                (Ok(start), Ok(end)) => match session_service.find_sessions_in_range(start, end) {
-                    Ok(sessions) => {
-                        if let Err(e) = print_table(sessions) {
-                            println!("Error printing table: {}", e);
+                (Ok(start), Ok(end)) => {
+                    match session_service.find_sessions_in_range(start, end, None) {
+                        Ok(sessions) => {
+                            if let Err(e) = print_table(sessions) {
+                                println!("Error printing table: {}", e);
+                            }
                         }
+                        Err(err) => println!("Error finding sessions: {}", err),
                     }
-                    Err(err) => println!("Error finding sessions: {}", err),
-                },
+                }
                 (Err(e1), Err(e2)) => {
                     println!("Failed to parse dates: {} and {}", e1, e2);
                 }
@@ -158,7 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
             let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-            match session_service.find_sessions_in_range(start, end) {
+            match session_service.find_sessions_in_range(start, end, None) {
                 Ok(sessions) => {
                     if let Err(e) = print_table(sessions) {
                         println!("Error printing table: {}", e);
@@ -182,7 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .and_local_timezone(Utc)
                 .unwrap();
 
-            match session_service.find_sessions_in_range(start, end) {
+            match session_service.find_sessions_in_range(start, end, None) {
                 Ok(sessions) => {
                     if let Err(e) = print_table(sessions) {
                         println!("Error printing table: {}", e);

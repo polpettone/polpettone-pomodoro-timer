@@ -112,13 +112,25 @@ impl SessionService {
         &self,
         range_start: DateTime<Utc>,
         range_end: DateTime<Utc>,
+        search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
         let sessions = self.load_sessions()?;
         let sessions_in_range = sessions
             .into_iter()
             .filter(|session| {
                 let session_end = session.start + session.duration;
-                session.start < range_end && session_end > range_start
+                let time_matches = session.start < range_end && session_end > range_start;
+
+                match &search_query {
+                    Some(query) => {
+                        time_matches
+                            && session
+                                .description
+                                .to_lowercase()
+                                .contains(&query.to_lowercase())
+                    }
+                    None => time_matches,
+                }
             })
             .collect();
         Ok(sessions_in_range)

@@ -13,22 +13,24 @@ pub enum Command {
         #[structopt(short = "d", long = "description", default_value = "no description")]
         description: String,
     },
-    Show {
-        #[structopt(short = "s", long = "search")]
-        search_query: Option<String>,
-    },
     FindSessionFromToday {
         #[structopt(short = "s", long = "search")]
         search_query: Option<String>,
+        #[structopt(short = "e", long = "export")]
+        export: bool,
     },
     FindSessionFromYesterday {
         #[structopt(short = "s", long = "search")]
         search_query: Option<String>,
+        #[structopt(short = "e", long = "export")]
+        export: bool,
     },
     FindSessionsInRange {
         start_date: String,
         end_date: String,
         #[structopt(short = "s", long = "search")]
         search_query: Option<String>,
+        #[structopt(short = "e", long = "export")]
+        export: bool,
     },
 }

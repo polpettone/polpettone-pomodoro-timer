@@ -5,11 +5,11 @@ mod date_time;
 mod session;
 
 use crate::config::Config;
+use chrono::Duration as ChronoDuration;
 use command::Command;
 
 use crate::session::Session;
 use crate::session::SessionService;
-use dialoguer::Select;
 
 use std::time::Duration;
 
@@ -59,19 +59,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Description: {}", description);
 
             session_service.start_session(&description, duration * 60)?;
-        }
-        Command::Show { search_query } => {
-            println!("Showing all sessions");
-
-            match session_service.load_sessions() {
-                Ok(sessions) => {
-                    print_table(sessions)?;
-                    select_options();
-                }
-                Err(e) => {
-                    eprintln!("Error loading sessions: {}", e);
-                }
-            }
         }
         Command::Active => {
             println!("Showing all sessions");
@@ -126,6 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             start_date,
             end_date,
             search_query,
+            export,
         } => {
             use chrono::prelude::*;
             use std::str::FromStr;
@@ -137,8 +125,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (Ok(start), Ok(end)) => {
                     match session_service.find_sessions_in_range(start, end, search_query) {
                         Ok(sessions) => {
-                            if let Err(e) = print_table(sessions) {
-                                println!("Error printing table: {}", e);
+                            if export {
+                                export_sessions(sessions)?;
+                            } else {
+                                print_table(sessions)?;
                             }
                         }
                         Err(err) => println!("Error finding sessions: {}", err),
@@ -155,7 +145,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        Command::FindSessionFromToday { search_query } => {
+        Command::FindSessionFromToday {
+            search_query,
+            export,
+        } => {
             use chrono::prelude::*;
             let now = Utc::now();
             let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
@@ -163,14 +156,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
-                    if let Err(e) = print_table(sessions) {
-                        println!("Error printing table: {}", e);
+                    if export {
+                        export_sessions(sessions)?;
+                    } else {
+                        print_table(sessions)?;
                     }
                 }
                 Err(err) => println!("Error finding sessions: {}", err),
             }
         }
-        Command::FindSessionFromYesterday { search_query } => {
+        Command::FindSessionFromYesterday {
+            search_query,
+            export,
+        } => {
             use chrono::prelude::*;
             let now = Utc::now();
             let yesterday = (now - chrono::Duration::days(1)).date_naive();
@@ -187,8 +185,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             match session_service.find_sessions_in_range(start, end, search_query) {
                 Ok(sessions) => {
-                    if let Err(e) = print_table(sessions) {
-                        println!("Error printing table: {}", e);
+                    if export {
+                        export_sessions(sessions)?;
+                    } else {
+                        print_table(sessions)?;
                     }
                 }
                 Err(err) => println!("Error finding sessions: {}", err),
@@ -222,15 +222,55 @@ fn print_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn select_options() {
-    let options = &["Session 1", "Session 2", "Session 3"];
+fn export_sessions(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
+    // Sortiere Sessions nach Startzeit
+    let mut sorted_sessions = sessions;
+    sorted_sessions.sort_by(|a, b| a.start.cmp(&b.start));
 
-    let selection = Select::new()
-        .with_prompt("Select your session")
-        .default(0)
-        .items(&options[..])
-        .interact()
-        .unwrap();
+    // Berechne die Gesamtdauer
+    let total_duration = sorted_sessions
+        .iter()
+        .fold(ChronoDuration::zero(), |acc, session| {
+            acc + ChronoDuration::from_std(session.duration).unwrap_or(ChronoDuration::zero())
+        });
 
-    println!("You selected: {}", options[selection]);
+    // Erstelle die Ausgabe
+    let mut output = String::new();
+
+    // Header
+    output.push_str("|No|Start|Dauer|Beschreibung|Anmerkungen|\n");
+    output.push_str("|-----|-----|-----|------|------|\n");
+
+    // Sessions
+    for (i, session) in sorted_sessions.iter().enumerate() {
+        let duration_formatted = format!(
+            "{:02}:{:02}",
+            session.duration.as_secs() / 60,
+            session.duration.as_secs() % 60
+        );
+
+        output.push_str(&format!(
+            "|{}|{}|{}|{}| |\n",
+            i + 1,
+            session.start.format("%Y-%m-%d %H:%M:%S"),
+            duration_formatted,
+            session.description
+        ));
+    }
+
+    // Footer mit Gesamtzeit
+    let total_minutes = total_duration.num_minutes();
+    output.push_str(&format!(
+        "|Total|--|{:02}:{:02}|--------|-------|\n",
+        total_minutes / 60,
+        total_minutes % 60
+    ));
+
+    // TBLFM Kommentar
+    output.push_str("<!-- TBLFM: @>$3=sum(@I..@-1);hm -->\n");
+
+    // Ausgabe auf der Konsole
+    print!("{}", output);
+
+    Ok(())
 }

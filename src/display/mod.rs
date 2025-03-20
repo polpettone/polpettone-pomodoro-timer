@@ -71,7 +71,6 @@ pub fn export_to_ascii_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error
         total_minutes % 60
     ));
 
-    // Ausgabe auf der Konsole
     print!("{}", output);
 
     Ok(())

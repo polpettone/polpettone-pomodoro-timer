@@ -9,7 +9,9 @@ use crate::config::Config;
 use crate::session::SessionService;
 
 use command::Command;
+use dirs::home_dir;
 use std::error::Error;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -18,17 +20,37 @@ use structopt::StructOpt;
 #[structopt(name = "pomodoro")]
 struct Opts {
     /// Optional configuration file
-    #[structopt(short = "c", long = "config", default_value = "config.toml")]
-    config: String,
+    #[structopt(short = "c", long = "config")]
+    config: Option<String>,
 
     #[structopt(subcommand)]
     cmd: Command,
 }
 
+fn get_config_path(custom_path: Option<String>) -> PathBuf {
+    if let Some(path) = custom_path {
+        PathBuf::from(path)
+    } else {
+        home_dir()
+            .unwrap_or_default()
+            .join(".config")
+            .join("pomo")
+            .join("config.toml")
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
+    let config_path = get_config_path(opts.config);
 
-    let config_string = std::fs::read_to_string(&opts.config)?;
+    let config_string = match std::fs::read_to_string(&config_path) {
+        Ok(content) => content,
+        Err(e) => {
+            eprintln!("Could not read config file at {:?}: {}", config_path, e);
+            // Optional: Hier könntest du Default-Werte verwenden oder das Programm beenden
+            return Err(Box::new(e));
+        }
+    };
     let config: Config = match toml::from_str(&config_string) {
         Ok(cfg) => cfg,
         Err(e) => {

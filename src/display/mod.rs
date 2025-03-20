@@ -44,8 +44,8 @@ pub fn export_sessions(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
     let mut output = String::new();
 
     // Header
-    output.push_str("|No|Start|Dauer|Beschreibung|Anmerkungen|\n");
-    output.push_str("|-----|-----|-----|------|------|\n");
+    output.push_str("|   No   |           Start       |   Dauer   |     Beschreibung   |\n");
+    output.push_str("|--------|-----------------------|-----------|--------------------|\n");
 
     // Sessions
     for (i, session) in sorted_sessions.iter().enumerate() {
@@ -56,24 +56,20 @@ pub fn export_sessions(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
         );
 
         output.push_str(&format!(
-            "|{}|{}|{}|{}| |\n",
+            "| {:6} | {:21} | {:9} | {:18} |\n",
             i + 1,
             session.start.format("%Y-%m-%d %H:%M:%S"),
             duration_formatted,
-            session.description
+            session.description,
         ));
     }
 
-    // Footer mit Gesamtzeit
     let total_minutes = total_duration.num_minutes();
     output.push_str(&format!(
-        "|Total|--|{:02}:{:02}|--------|-------|\n",
+        "| Total  |            --         | {:02}:{:02}     |      --------      |\n",
         total_minutes / 60,
         total_minutes % 60
     ));
-
-    // TBLFM Kommentar
-    output.push_str("<!-- TBLFM: @>$3=sum(@I..@-1);hm -->\n");
 
     // Ausgabe auf der Konsole
     print!("{}", output);

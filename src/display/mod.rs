@@ -29,18 +29,15 @@ pub fn print_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn export_to_ascii_table(sessions: Vec<Session>) -> Result<(), Box<dyn Error>> {
-    // Sortiere Sessions nach Startzeit
     let mut sorted_sessions = sessions;
     sorted_sessions.sort_by(|a, b| a.start.cmp(&b.start));
 
-    // Berechne die Gesamtdauer
     let total_duration = sorted_sessions
         .iter()
         .fold(ChronoDuration::zero(), |acc, session| {
             acc + ChronoDuration::from_std(session.duration).unwrap_or(ChronoDuration::zero())
         });
 
-    // Erstelle die Ausgabe
     let mut output = String::new();
 
     // Header

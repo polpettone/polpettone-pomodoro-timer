@@ -131,10 +131,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             export,
         } => {
             use chrono::prelude::*;
-            use std::str::FromStr;
 
-            let parsed_start = DateTime::from_str(&start_date);
-            let parsed_end = DateTime::from_str(&end_date);
+            // Parse dates using NaiveDateTime first
+            let parsed_start = NaiveDateTime::parse_from_str(&start_date, "%Y-%m-%d %H:%M:%S")
+                .map(|dt| dt.and_utc());
+            let parsed_end = NaiveDateTime::parse_from_str(&end_date, "%Y-%m-%d %H:%M:%S")
+                .map(|dt| dt.and_utc());
 
             match (parsed_start, parsed_end) {
                 (Ok(start), Ok(end)) => {

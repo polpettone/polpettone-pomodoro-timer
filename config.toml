@@ -1,2 +1,4 @@
 [pomodoro_config]
 pomodoro_session_dir = "/home/kenny/pomodoro-sessions"
+pomodoro_status_path="/home/akim/pomodoro/pomodoro-status"
+

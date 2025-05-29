@@ -61,6 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let session_service = SessionService {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
+        pomodoro_status_path: config.pomodoro_config.pomodoro_status_path,
     };
 
     match opts.cmd {
@@ -92,9 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Watch => loop {
             match session_service.find_all_active_sessions() {
                 Ok(sessions) => {
-                    session_service.update_pomodoro_status(
-                        "/home/kenny/pomodoro/pomodoro-status".to_string(),
-                    )?;
+                    session_service.update_pomodoro_status()?;
                     const ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE: &str = "\x1B[2J\x1B[1;1H";
                     print!("{}", ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE);
                     for session in sessions {

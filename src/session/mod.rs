@@ -36,6 +36,7 @@ impl Session {
 
 pub struct SessionService {
     pub pomodoro_session_dir: String,
+    pub pomodoro_status_path: String,
 }
 
 impl SessionService {
@@ -88,13 +89,13 @@ impl SessionService {
         Ok(active_sessions)
     }
 
-    pub fn update_pomodoro_status(&self, path_to_status_file: String) -> Result<(), io::Error> {
+    pub fn update_pomodoro_status(&self) -> Result<(), io::Error> {
         if let Ok(sessions) = self.find_all_active_sessions() {
             if let Some(session) = sessions.get(0) {
                 let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
-                    .open(path_to_status_file)?;
+                    .open(self.pomodoro_status_path.clone())?;
 
                 writeln!(
                     file,

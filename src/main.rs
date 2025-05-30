@@ -10,6 +10,7 @@ use crate::session::SessionService;
 
 use command::Command;
 use dirs::home_dir;
+use home;
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
@@ -49,17 +50,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(content) => content,
         Err(e) => {
             eprintln!("Could not read config {:?} : {}", config_path, e);
+            let home_dir = home::home_dir().expect("could not determine home dir");
+            let home_str = home_dir.to_str().expect("broken");
 
             if e.kind() == ErrorKind::NotFound {
-                let default_config = r#"
+                let default_config = format!(
+                    r#"
     [pomodoro_config]
-    pomodoro_session_dir = "/tmp/sessions"
-    pomodoro_status_path = "/tmp/status"
-    "#;
+    pomodoro_session_dir = "{}/polpettone-pomodoro-timer/sessions/"
+    pomodoro_status_path = "{}/polpettone-pomodoro-timer/status"
+    "#,
+                    home_str, home_str
+                );
                 if let Some(parent) = config_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                fs::write(&config_path, default_config)?;
+                fs::write(&config_path, default_config.clone())?;
                 eprintln!("A default config file created {:?}.", config_path);
                 default_config.to_string()
             } else {

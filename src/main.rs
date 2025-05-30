@@ -11,6 +11,8 @@ use crate::session::SessionService;
 use command::Command;
 use dirs::home_dir;
 use std::error::Error;
+use std::fs;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -34,7 +36,7 @@ fn get_config_path(custom_path: Option<String>) -> PathBuf {
         home_dir()
             .unwrap_or_default()
             .join(".config")
-            .join("pomo")
+            .join("polpettone-pomodoro-timer")
             .join("config.toml")
     }
 }
@@ -43,12 +45,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
     let config_path = get_config_path(opts.config);
 
-    let config_string = match std::fs::read_to_string(&config_path) {
+    let config_string = match fs::read_to_string(&config_path) {
         Ok(content) => content,
         Err(e) => {
-            eprintln!("Could not read config file at {:?}: {}", config_path, e);
-            // Optional: Hier könntest du Default-Werte verwenden oder das Programm beenden
-            return Err(Box::new(e));
+            eprintln!("Could not read config {:?} : {}", config_path, e);
+
+            if e.kind() == ErrorKind::NotFound {
+                let default_config = r#"
+    [pomodoro_config]
+    pomodoro_session_dir = "/tmp/sessions"
+    pomodoro_status_path = "/tmp/status"
+    "#;
+                if let Some(parent) = config_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(&config_path, default_config)?;
+                eprintln!("A default config file created {:?}.", config_path);
+                default_config.to_string()
+            } else {
+                return Err(Box::new(e));
+            }
         }
     };
     let config: Config = match toml::from_str(&config_string) {

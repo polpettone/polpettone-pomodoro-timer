@@ -1,6 +1,8 @@
 
 # Pomodoro Timer
 
+A command line pomodoro timer.
+
 ## Install
 
 ### Option 1
@@ -32,10 +34,9 @@ U need to create this directory manually or run
 polpettone-pomodoro-timer --init-session-dir
 ```
 
-In this directory is also the status file. 
-In there is the status of the current or last pomodoro session. 
-
-U can use this to integrate this to your polybar or another kind of status bar.
+A status file with the status of the current or last pomodoro session is in 
+this directory also. 
+You can use this to integrate this to your polybar or another kind of status bar.
 
 ### Watch a running session
 ```
@@ -45,3 +46,17 @@ This will watch and update the timer of the last running session.
 U need to run this to update the status file.
 
 
+### Get your sessions 
+```
+polpettone-pomodoro-timer find-session-from-today
+```
+This will show you the pomodoro sessions from today.
+There also commands to get your session for a specific time range.
+
+
+### Help 
+For more commands run 
+
+```
+polpettone-pomodoro-timer help
+```

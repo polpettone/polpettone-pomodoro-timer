@@ -11,20 +11,23 @@ polpettone-pomodoro-timer start -d 'hacken'
 ```
 Initial run of the command will create a config file ~/.config/polpettone-pomodoro-timer/config.toml
 
-In the config.toml are 2 path settings.
+In the config.toml is the path setting for the session files.
+Each sessions is saved in one yaml file.
 
 this is the default: 
 ```
-pomodoro_session_dir = "~/pomodoro-sessions"
-pomodoro_status_path="~/pomodoro-status"
+pomodoro_session_dir = "~/polpettone-pomodoro-sessions"
 ```
 
-pomodoro-sessions is the directory where the sessions will be saved
-Each sessions is one yaml file
+U need to create this directory manually or run 
+```
+polpettone-pomodoro-timer --init-session-dir
+```
 
-pomodoro-status contains the status of the current or last running session.
-U can use this to integrate this to your polybar.
-If u dont have a polybar or dont know what it is, just ignore this setting.
+In this directory is also the status file. 
+In there is the status of the current or last pomodoro session. 
+
+U can use this to integrate this to your polybar or another kind of status bar.
 
 
 

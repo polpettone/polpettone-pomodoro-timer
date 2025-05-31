@@ -36,7 +36,6 @@ impl Session {
 
 pub struct SessionService {
     pub pomodoro_session_dir: String,
-    pub pomodoro_status_path: String,
 }
 
 impl SessionService {
@@ -59,6 +58,11 @@ impl SessionService {
         };
 
         serialize_session(&session, session_dir, start_date)?;
+        Ok(())
+    }
+
+    pub fn init_session_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+        fs::create_dir_all(&self.pomodoro_session_dir)?;
         Ok(())
     }
 
@@ -95,7 +99,7 @@ impl SessionService {
                 let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
-                    .open(self.pomodoro_status_path.clone())?;
+                    .open(self.pomodoro_session_dir.clone() + "status")?;
 
                 writeln!(
                     file,

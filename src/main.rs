@@ -57,10 +57,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let default_config = format!(
                     r#"
     [pomodoro_config]
-    pomodoro_session_dir = "{}/polpettone-pomodoro-timer/sessions/"
-    pomodoro_status_path = "{}/polpettone-pomodoro-timer/status"
+    pomodoro_session_dir = "{}/polpettone-pomodoro-timer-sessions/"
     "#,
-                    home_str, home_str
+                    home_str
                 );
                 if let Some(parent) = config_path.parent() {
                     fs::create_dir_all(parent)?;
@@ -83,10 +82,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let session_service = SessionService {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
-        pomodoro_status_path: config.pomodoro_config.pomodoro_status_path,
     };
 
     match opts.cmd {
+        Command::InitSessionDir => {
+            println!("init session dir");
+            session_service.init_session_dir()?;
+        }
         Command::Start {
             duration,
             description,

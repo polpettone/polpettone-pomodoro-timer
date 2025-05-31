@@ -11,7 +11,9 @@ A command line pomodoro timer.
 ### Option 2 
 - prerequisite: archlinux/manjaro and yay
 
-```yay -S polpettone-pomodoro-timer```
+```
+yay -S polpettone-pomodoro-timer
+```
 
 
 ## Usage

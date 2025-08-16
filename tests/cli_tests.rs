@@ -8,7 +8,6 @@ fn test_cli_output() {
     let session_dir = temp_dir.path().join("session");
     fs::create_dir_all(&session_dir).expect("Failed to create pomodoro directory");
 
-    // Verwende `format!` für die String-Interpolation
     let config_content = format!(
         r#"
         [pomodoro_config]
@@ -24,9 +23,9 @@ fn test_cli_output() {
     let output = Command::new("cargo")
         .arg("run")
         .arg("--")
-        .arg("--config") // Verwenden Sie das Config-Argument
+        .arg("--config")
         .arg(config_path)
-        .arg("start") // Hinzufügen des "start" Kommandos
+        .arg("start")
         .arg("--duration")
         .arg("30")
         .arg("--description")

@@ -3,6 +3,7 @@ mod command;
 mod config;
 mod date_time;
 mod display;
+mod gui;
 mod session;
 
 use crate::config::Config;
@@ -85,6 +86,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     match opts.cmd {
+        Command::Gui => {
+            gui::show();
+            println!("gui not implemented yet");
+        }
+
         Command::InitSessionDir => {
             println!("init session dir");
             session_service.init_session_dir()?;

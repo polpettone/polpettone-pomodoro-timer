@@ -2,6 +2,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
+    Gui,
     InitSessionDir,
     Active,
     Watch,

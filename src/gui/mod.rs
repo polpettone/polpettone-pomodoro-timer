@@ -2,7 +2,7 @@ use eframe::egui;
 
 pub fn show() -> eframe::Result {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([420.0, 340.0]),
         ..Default::default()
     };
 
@@ -34,19 +34,28 @@ impl Default for PomodoroSession {
 impl eframe::App for PomodoroSession {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Polpettone Pomodor Timer");
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Session: ");
-                ui.text_edit_singleline(&mut self.name)
-                    .labelled_by(name_label.id);
+            ui.centered_and_justified(|ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                    ui.heading(
+                        egui::RichText::new("Polpettone Pomodor Timer")
+                            .font(egui::FontId::proportional(40.0)),
+                    );
+
+                    ui.horizontal(|ui| {
+                        let name_label = ui.label("Session: ");
+                        ui.text_edit_singleline(&mut self.name)
+                            .labelled_by(name_label.id);
+                    });
+
+                    ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
+
+                    if ui.button("Start").clicked() {
+                        println!("Started PomodoroSession")
+                    }
+
+                    ui.label(format!("Hello '{}', age {}", self.name, self.minutes));
+                });
             });
-            ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
-
-            if ui.button("Start").clicked() {
-                println!("Started PomodoroSession")
-            }
-
-            ui.label(format!("Hello '{}', age {}", self.name, self.minutes));
         });
     }
 }

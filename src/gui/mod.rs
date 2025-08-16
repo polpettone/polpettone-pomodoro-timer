@@ -49,11 +49,19 @@ impl eframe::App for PomodoroSession {
 
                     ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
 
-                    if ui.button("Start").clicked() {
+                    if ui
+                        .add(egui::Button::new(
+                            egui::RichText::new("Start").font(egui::FontId::proportional(30.0)),
+                        ))
+                        .clicked()
+                    {
                         println!("Started PomodoroSession")
                     }
 
-                    ui.label(format!("Hello '{}', age {}", self.name, self.minutes));
+                    ui.label(format!(
+                        "Started Session: '{}', with {} minutes",
+                        self.name, self.minutes
+                    ));
                 });
             });
         });

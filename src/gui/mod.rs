@@ -17,9 +17,11 @@ pub fn show() -> eframe::Result {
         }),
     )
 }
+
 struct PomodoroSession {
     name: String,
     minutes: u32,
+    difficulty: u8,
 }
 
 impl Default for PomodoroSession {
@@ -27,6 +29,7 @@ impl Default for PomodoroSession {
         Self {
             name: "Progamming".to_owned(),
             minutes: 25,
+            difficulty: 3,
         }
     }
 }
@@ -47,7 +50,7 @@ impl eframe::App for PomodoroSession {
 
                     ui.heading(
                         egui::RichText::new("Polpettone Pomodor Timer")
-                            .font(egui::FontId::proportional(30.0)),
+                            .font(egui::FontId::proportional(40.0)),
                     );
                     ui.add_space(25.0);
 
@@ -58,8 +61,19 @@ impl eframe::App for PomodoroSession {
                     });
                     ui.add_space(10.0);
 
-                    ui.add(egui::Slider::new(&mut self.minutes, 1..=60).text("Minutes"));
-                    ui.add_space(120.0);
+                    ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        ui.label("Difficulty:");
+                        ui.radio_value(&mut self.difficulty, 1, "1");
+                        ui.radio_value(&mut self.difficulty, 2, "2");
+                        ui.radio_value(&mut self.difficulty, 3, "3");
+                        ui.radio_value(&mut self.difficulty, 4, "4");
+                        ui.radio_value(&mut self.difficulty, 5, "5");
+                    });
+
+                    ui.add_space(20.0);
 
                     if ui
                         .add(egui::Button::new(

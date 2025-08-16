@@ -43,53 +43,56 @@ impl eframe::App for PomodoroSession {
             // This helper function centers its single child.
             ui.centered_and_justified(|ui| {
                 // We create a Frame, which will act as our bordered container.
-                // This frame is the single child that will be centered.
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    // Inside the frame, we use a vertical layout to stack our widgets.
-                    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                        // By setting a fixed width, we ensure the frame's content
-                        // doesn't expand, which makes centering predictable.
-                        ui.set_width(280.0);
+                // This frame is the single child that will be centered by the layout.
+                egui::Frame::group(ui.style())
+                    .stroke(egui::Stroke::NONE)
+                    .show(ui, |ui| {
+                        // Inside the frame, we use a standard vertical layout to stack our widgets.
+                        ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                            // By setting a fixed width, we ensure the frame's content
+                            // doesn't expand, which makes centering predictable.
+                            ui.set_width(280.0);
 
-                        ui.heading(
-                            egui::RichText::new("Polpettone Pomodor Timer")
-                                .font(egui::FontId::proportional(40.0)),
-                        );
-                        ui.add_space(25.0);
+                            ui.heading(
+                                egui::RichText::new("Polpettone Pomodor Timer")
+                                    .font(egui::FontId::proportional(40.0)),
+                            );
+                            ui.add_space(25.0);
 
-                        ui.horizontal(|ui| {
-                            let name_label = ui.label("Session: ");
-                            ui.text_edit_singleline(&mut self.name)
-                                .labelled_by(name_label.id);
+                            ui.horizontal(|ui| {
+                                let name_label = ui.label("Session: ");
+                                ui.text_edit_singleline(&mut self.name)
+                                    .labelled_by(name_label.id);
+                            });
+                            ui.add_space(10.0);
+
+                            ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
+                            ui.add_space(10.0);
+
+                            ui.horizontal(|ui| {
+                                ui.label("Difficulty:");
+                                ui.radio_value(&mut self.difficulty, 1, "1");
+                                ui.radio_value(&mut self.difficulty, 2, "2");
+                                ui.radio_value(&mut self.difficulty, 3, "3");
+                                ui.radio_value(&mut self.difficulty, 4, "4");
+                                ui.radio_value(&mut self.difficulty, 5, "5");
+                            });
+                            ui.add_space(20.0);
+
+                            if ui
+                                .add(egui::Button::new(
+                                    egui::RichText::new("Start")
+                                        .font(egui::FontId::proportional(30.0)),
+                                ))
+                                .clicked()
+                            {
+                                println!(
+                                    "Started PomodoroSession with difficulty {}",
+                                    self.difficulty
+                                )
+                            }
                         });
-                        ui.add_space(10.0);
-
-                        ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
-                        ui.add_space(10.0);
-
-                        ui.horizontal(|ui| {
-                            ui.label("Difficulty:");
-                            ui.radio_value(&mut self.difficulty, 1, "1");
-                            ui.radio_value(&mut self.difficulty, 2, "2");
-                            ui.radio_value(&mut self.difficulty, 3, "3");
-                            ui.radio_value(&mut self.difficulty, 4, "4");
-                            ui.radio_value(&mut self.difficulty, 5, "5");
-                        });
-                        ui.add_space(20.0);
-
-                        if ui
-                            .add(egui::Button::new(
-                                egui::RichText::new("Start").font(egui::FontId::proportional(30.0)),
-                            ))
-                            .clicked()
-                        {
-                            println!(
-                                "Started PomodoroSession with difficulty {}",
-                                self.difficulty
-                            )
-                        }
                     });
-                });
             });
         });
     }

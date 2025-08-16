@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match opts.cmd {
         Command::Gui => {
-            gui::show();
+            let _ = gui::show();
             println!("gui not implemented yet");
         }
 

@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match opts.cmd {
         Command::Gui => {
-            let _ = gui::show();
+            let _ = gui::show(session_service);
             println!("gui not implemented yet");
         }
 

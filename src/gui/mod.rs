@@ -1,7 +1,8 @@
+use crate::SessionService;
 use eframe::egui;
 
 // The public function that starts and runs the GUI.
-pub fn show() -> eframe::Result {
+pub fn show(session_service: SessionService) -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([420.0, 540.0]),
         ..Default::default()
@@ -14,7 +15,7 @@ pub fn show() -> eframe::Result {
             // Install egui image loaders (good practice).
             egui_extras::install_image_loaders(&cc.egui_ctx);
             // Create the initial state of the app.
-            Ok(Box::<PomodoroSession>::default())
+            Ok(Box::new(PomodoroSession::new(session_service)))
         }),
     )
 }
@@ -32,16 +33,18 @@ struct PomodoroSession {
     minutes: u32,
     difficulty: u8,
     state: State,
+    session_service: SessionService,
 }
 
 // Provides the default initial state for the application.
-impl Default for PomodoroSession {
-    fn default() -> Self {
+impl PomodoroSession {
+    fn new(session_service: SessionService) -> Self {
         Self {
             name: "Progamming".to_owned(),
             minutes: 25,
             difficulty: 3, // Default to medium
             state: State::Canceled,
+            session_service,
         }
     }
 }
@@ -158,6 +161,8 @@ impl PomodoroSession {
                 State::Running => State::Canceled,
                 State::Canceled => State::Running,
             };
+
+            let _ = self.session_service.start_session(&self.name, 25);
         }
     }
 }

@@ -2,7 +2,7 @@ use eframe::egui;
 
 pub fn show() -> eframe::Result {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([420.0, 340.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([420.0, 440.0]),
         ..Default::default()
     };
 
@@ -29,7 +29,7 @@ impl Default for PomodoroSession {
         Self {
             name: "Progamming".to_owned(),
             minutes: 25,
-            difficulty: 3,
+            difficulty: 3, // Default to medium
         }
     }
 }
@@ -38,60 +38,57 @@ impl eframe::App for PomodoroSession {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_pixels_per_point(1.5);
 
+        // The CentralPanel is the main container that fills the window.
         egui::CentralPanel::default().show(ctx, |ui| {
-            // This special layout centers a single item vertically and horizontally.
+            // This helper function centers its single child.
             ui.centered_and_justified(|ui| {
-                // The "single item" is a vertical layout containing all our widgets.
-                // By setting a max width on this inner ui, we prevent greedy widgets
-                // like Sliders from expanding to fill the whole window. The centered_and_justified
-                // layout then correctly centers our constrained-width vertical layout.
-                ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                    ui.set_max_width(280.0); // Set a max width for the content block
+                // We create a Frame, which will act as our bordered container.
+                // This frame is the single child that will be centered.
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    // Inside the frame, we use a vertical layout to stack our widgets.
+                    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                        // By setting a fixed width, we ensure the frame's content
+                        // doesn't expand, which makes centering predictable.
+                        ui.set_width(280.0);
 
-                    ui.heading(
-                        egui::RichText::new("Polpettone Pomodor Timer")
-                            .font(egui::FontId::proportional(40.0)),
-                    );
-                    ui.add_space(25.0);
+                        ui.heading(
+                            egui::RichText::new("Polpettone Pomodor Timer")
+                                .font(egui::FontId::proportional(40.0)),
+                        );
+                        ui.add_space(25.0);
 
-                    ui.horizontal(|ui| {
-                        let name_label = ui.label("Session: ");
-                        ui.text_edit_singleline(&mut self.name)
-                            .labelled_by(name_label.id);
+                        ui.horizontal(|ui| {
+                            let name_label = ui.label("Session: ");
+                            ui.text_edit_singleline(&mut self.name)
+                                .labelled_by(name_label.id);
+                        });
+                        ui.add_space(10.0);
+
+                        ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
+                        ui.add_space(10.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label("Difficulty:");
+                            ui.radio_value(&mut self.difficulty, 1, "1");
+                            ui.radio_value(&mut self.difficulty, 2, "2");
+                            ui.radio_value(&mut self.difficulty, 3, "3");
+                            ui.radio_value(&mut self.difficulty, 4, "4");
+                            ui.radio_value(&mut self.difficulty, 5, "5");
+                        });
+                        ui.add_space(20.0);
+
+                        if ui
+                            .add(egui::Button::new(
+                                egui::RichText::new("Start").font(egui::FontId::proportional(30.0)),
+                            ))
+                            .clicked()
+                        {
+                            println!(
+                                "Started PomodoroSession with difficulty {}",
+                                self.difficulty
+                            )
+                        }
                     });
-                    ui.add_space(10.0);
-
-                    ui.add(egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes"));
-                    ui.add_space(10.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label("Difficulty:");
-                        ui.radio_value(&mut self.difficulty, 1, "1");
-                        ui.radio_value(&mut self.difficulty, 2, "2");
-                        ui.radio_value(&mut self.difficulty, 3, "3");
-                        ui.radio_value(&mut self.difficulty, 4, "4");
-                        ui.radio_value(&mut self.difficulty, 5, "5");
-                    });
-
-                    ui.add_space(20.0);
-
-                    if ui
-                        .add(egui::Button::new(
-                            egui::RichText::new("Start").font(egui::FontId::proportional(30.0)),
-                        ))
-                        .clicked()
-                    {
-                        println!("Started PomodoroSession")
-                    }
-
-                    // The status label is commented out as it affects the centering layout.
-                    // It would be better placed in a different part of the UI, like a status bar.
-                    /*
-                    ui.label(format!(
-                        "Started Session: '{}', with {} minutes",
-                        self.name, self.minutes
-                    ));
-                    */
                 });
             });
         });

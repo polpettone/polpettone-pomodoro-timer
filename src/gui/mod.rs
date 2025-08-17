@@ -101,12 +101,13 @@ impl PomodoroSession {
             Ok(sessions) => {
                 if let Some(session) = sessions.get(0) {
                     let timer_text = format!(
-                        "{} - {}",
+                        "{}: \n {} - {}",
+                        session.description,
                         duration_in_minutes(session.duration),
                         duration_in_minutes(session.elapsed_duration())
                     );
                     ui.heading(
-                        egui::RichText::new(timer_text).font(egui::FontId::proportional(40.0)),
+                        egui::RichText::new(timer_text).font(egui::FontId::proportional(30.0)),
                     );
                     ui.add_space(25.0);
                 }
@@ -175,11 +176,12 @@ impl PomodoroSession {
         {
             // Toggle the state when the button is activated.
             self.state = match self.state {
+                State::Canceled => {
+                    let _ = self.session_service.start_session(&self.name, 25 * 60);
+                    State::Running
+                }
                 State::Running => State::Canceled,
-                State::Canceled => State::Running,
             };
-
-            let _ = self.session_service.start_session(&self.name, 25 * 60);
         }
     }
 }

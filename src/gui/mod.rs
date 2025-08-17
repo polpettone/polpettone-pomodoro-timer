@@ -194,7 +194,15 @@ impl PomodoroSession {
         ui.heading("Past Sessions");
         ui.add_space(10.0);
 
-        if let Ok(sessions) = self.session_service.load_sessions() {
+        use chrono::prelude::*;
+        let now = Utc::now();
+        let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
+
+        if let Ok(sessions) = self
+            .session_service
+            .find_sessions_in_range(start, end, None)
+        {
             let now = Utc::now();
             let mut past_sessions: Vec<&Session> = sessions
                 .iter()

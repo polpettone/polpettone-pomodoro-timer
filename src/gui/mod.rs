@@ -1,4 +1,4 @@
-use crate::SessionService;
+use crate::{date_time::duration_in_minutes, SessionService};
 use eframe::egui;
 
 // The public function that starts and runs the GUI.
@@ -95,8 +95,25 @@ impl PomodoroSession {
 
     /// Draws the main title heading.
     fn draw_header(&self, ui: &mut egui::Ui) {
-        ui.heading(egui::RichText::new("").font(egui::FontId::proportional(40.0)));
-        ui.add_space(25.0);
+        match self.session_service.find_all_active_sessions() {
+            Ok(sessions) => {
+                if let Some(session) = sessions.get(0) {
+                    let timer_text = format!(
+                        "{} - {}",
+                        duration_in_minutes(session.duration),
+                        duration_in_minutes(session.elapsed_duration())
+                    );
+                    ui.heading(
+                        egui::RichText::new(timer_text).font(egui::FontId::proportional(40.0)),
+                    );
+                    ui.add_space(25.0);
+                }
+            }
+
+            Err(e) => {
+                eprint!("Error loading sessions: {}", e)
+            }
+        }
     }
 
     /// Draws the "Session" label and text input field.
@@ -162,7 +179,7 @@ impl PomodoroSession {
                 State::Canceled => State::Running,
             };
 
-            let _ = self.session_service.start_session(&self.name, 25);
+            let _ = self.session_service.start_session(&self.name, 25 * 60);
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::{date_time::duration_in_minutes, SessionService};
 use eframe::egui;
+use std::time::Duration;
 
 // The public function that starts and runs the GUI.
 pub fn show(session_service: SessionService) -> eframe::Result {
@@ -53,6 +54,7 @@ impl PomodoroSession {
 impl eframe::App for PomodoroSession {
     /// This is the main update loop, called on every frame.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint_after(Duration::from_millis(1000));
         ctx.set_pixels_per_point(2.5);
 
         egui::CentralPanel::default().show(ctx, |ui| {

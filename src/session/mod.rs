@@ -86,10 +86,13 @@ impl SessionService {
     pub fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
         let sessions = self.load_sessions()?;
         let now = Utc::now();
-        let active_sessions = sessions
+        let mut active_sessions: Vec<Session> = sessions
             .into_iter()
             .filter(|session| session.start + session.duration > now)
             .collect();
+
+        active_sessions.sort_by(|a, b| b.start.cmp(&a.start));
+
         Ok(active_sessions)
     }
 

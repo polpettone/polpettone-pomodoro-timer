@@ -98,13 +98,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Start {
             duration,
             description,
+            difficulty,
         } => {
             println!("Starting session: {} for {} minutes", description, duration);
 
             println!("Duration: {} minutes", duration);
             println!("Description: {}", description);
 
-            session_service.start_session(&description, duration * 60)?;
+            session_service.start_session(&description, duration * 60, difficulty)?;
         }
         Command::Active => {
             println!("Showing all sessions");

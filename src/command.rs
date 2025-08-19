@@ -14,6 +14,10 @@ pub enum Command {
         /// Description of this session
         #[structopt(short = "d", long = "description", default_value = "no description")]
         description: String,
+
+        /// Difficulty of this session
+        #[structopt(short = "s", long = "difficulty", default_value = "3")]
+        difficulty: u8,
     },
     FindSessionFromToday {
         #[structopt(short = "s", long = "search")]

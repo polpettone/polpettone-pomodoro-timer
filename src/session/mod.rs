@@ -12,10 +12,17 @@ use crate::date_time::{deserialize_human_readable, duration_in_minutes, serializ
 use std::fs::OpenOptions;
 use std::io;
 
+fn default_difficulty() -> u8 {
+    3
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
     pub description: String,
     pub duration: Duration,
+    // difficulty from 1 to 5
+    #[serde(default = "default_difficulty")]
+    pub difficulty: u8,
     #[serde(
         serialize_with = "serialize_human_readable",
         deserialize_with = "deserialize_human_readable"
@@ -43,6 +50,7 @@ impl SessionService {
         &self,
         description: &str,
         duration_seconds: u64,
+        difficulty: u8,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let start = SystemTime::now();
         let start_date: DateTime<Utc> = start.into();
@@ -54,6 +62,7 @@ impl SessionService {
         let session = Session {
             description: description.to_string(),
             duration: Duration::new(duration_seconds, 0),
+            difficulty,
             start: start_date,
         };
 

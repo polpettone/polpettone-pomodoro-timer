@@ -180,7 +180,7 @@ impl PomodoroSession {
             // Toggle the state when the button is activated.
             self.state = match self.state {
                 State::Canceled => {
-                    let _ = self.session_service.start_session(&self.name, 25 * 60);
+                    let _ = self.session_service.start_session(&self.name, 25 * 60, self.difficulty);
                     State::Running
                 }
                 State::Running => State::Canceled,

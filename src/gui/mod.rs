@@ -90,7 +90,7 @@ impl PomodoroSession {
             ui.set_width(280.0);
 
             self.draw_header(ui);
-            self.draw_session_input(ui);
+            self.draw_session_input(ui, ctx);
             self.draw_duration_slider(ui);
             self.draw_difficulty_selector(ui);
             self.draw_action_button(ui, ctx);
@@ -123,11 +123,15 @@ impl PomodoroSession {
     }
 
     /// Draws the "Session" label and text input field.
-    fn draw_session_input(&mut self, ui: &mut egui::Ui) {
+    fn draw_session_input(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             let name_label = ui.label("Session: ");
-            ui.text_edit_singleline(&mut self.name)
+            let response = ui.text_edit_singleline(&mut self.name)
                 .labelled_by(name_label.id);
+
+            if ctx.input(|i| i.key_pressed(egui::Key::F)) && !response.has_focus() {
+                response.request_focus();
+            }
         });
         ui.add_space(10.0);
     }

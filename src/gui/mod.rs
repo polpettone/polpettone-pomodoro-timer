@@ -1,6 +1,5 @@
 use crate::date_time::duration_in_minutes;
 use crate::session::{Session, SessionService};
-use chrono::Utc;
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 use std::time::Duration;
@@ -191,60 +190,61 @@ impl PomodoroSession {
 
     fn draw_session_table(&mut self, ui: &mut egui::Ui) {
         ui.add_space(20.0);
-        ui.heading("Past Sessions");
-        ui.add_space(10.0);
+        egui::CollapsingHeader::new("Past Sessions").show(ui, |ui| {
+            ui.add_space(10.0);
 
-        use chrono::prelude::*;
-        let now = Utc::now();
-        let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-        let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
-
-        if let Ok(sessions) = self
-            .session_service
-            .find_sessions_in_range(start, end, None)
-        {
+            use chrono::prelude::*;
             let now = Utc::now();
-            let mut past_sessions: Vec<&Session> = sessions
-                .iter()
-                .filter(|s| s.start + s.duration <= now)
-                .collect();
+            let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+            let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-            past_sessions.sort_by(|a, b| b.start.cmp(&a.start));
+            if let Ok(sessions) = self
+                .session_service
+                .find_sessions_in_range(start, end, None)
+            {
+                let now = Utc::now();
+                let mut past_sessions: Vec<&Session> = sessions
+                    .iter()
+                    .filter(|s| s.start + s.duration <= now)
+                    .collect();
 
-            let table = TableBuilder::new(ui)
-                .striped(true)
-                .resizable(true)
-                .column(Column::auto())
-                .column(Column::auto())
-                .column(Column::remainder());
+                past_sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
-            table
-                .header(20.0, |mut header| {
-                    header.col(|ui| {
-                        ui.strong("Description");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Duration");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Start Time");
-                    });
-                })
-                .body(|mut body| {
-                    for session in past_sessions.iter() {
-                        body.row(30.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(session.description.to_string());
-                            });
-                            row.col(|ui| {
-                                ui.label(format!("{} min", session.duration.as_secs() / 60));
-                            });
-                            row.col(|ui| {
-                                ui.label(session.start.format("%Y-%m-%d %H:%M").to_string());
-                            });
+                let table = TableBuilder::new(ui)
+                    .striped(true)
+                    .resizable(true)
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::remainder());
+
+                table
+                    .header(20.0, |mut header| {
+                        header.col(|ui| {
+                            ui.strong("Description");
                         });
-                    }
-                });
-        }
+                        header.col(|ui| {
+                            ui.strong("Duration");
+                        });
+                        header.col(|ui| {
+                            ui.strong("Start Time");
+                        });
+                    })
+                    .body(|mut body| {
+                        for session in past_sessions.iter() {
+                            body.row(30.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label(session.description.to_string());
+                                });
+                                row.col(|ui| {
+                                    ui.label(format!("{} min", session.duration.as_secs() / 60));
+                                });
+                                row.col(|ui| {
+                                    ui.label(session.start.format("%Y-%m-%d %H:%M").to_string());
+                                });
+                            });
+                        }
+                    });
+            }
+        });
     }
 }

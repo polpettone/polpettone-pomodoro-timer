@@ -180,7 +180,9 @@ impl PomodoroSession {
             // Toggle the state when the button is activated.
             self.state = match self.state {
                 State::Canceled => {
-                    let _ = self.session_service.start_session(&self.name, 25 * 60, self.difficulty);
+                    let _ =
+                        self.session_service
+                            .start_session(&self.name, 25 * 60, self.difficulty);
                     State::Running
                 }
                 State::Running => State::Canceled,
@@ -215,10 +217,14 @@ impl PomodoroSession {
                     .resizable(true)
                     .column(Column::auto())
                     .column(Column::auto())
+                    .column(Column::auto())
                     .column(Column::remainder());
 
                 table
                     .header(20.0, |mut header| {
+                        header.col(|ui| {
+                            ui.strong("Start Time");
+                        });
                         header.col(|ui| {
                             ui.strong("Description");
                         });
@@ -226,12 +232,15 @@ impl PomodoroSession {
                             ui.strong("Duration");
                         });
                         header.col(|ui| {
-                            ui.strong("Start Time");
+                            ui.strong("D");
                         });
                     })
                     .body(|mut body| {
                         for session in past_sessions.iter() {
                             body.row(30.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label(session.start.format("%Y-%m-%d %H:%M").to_string());
+                                });
                                 row.col(|ui| {
                                     ui.label(session.description.to_string());
                                 });
@@ -239,7 +248,7 @@ impl PomodoroSession {
                                     ui.label(format!("{} min", session.duration.as_secs() / 60));
                                 });
                                 row.col(|ui| {
-                                    ui.label(session.start.format("%Y-%m-%d %H:%M").to_string());
+                                    ui.label(format!("{}", session.difficulty));
                                 });
                             });
                         }

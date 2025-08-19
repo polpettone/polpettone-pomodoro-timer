@@ -37,6 +37,7 @@ struct PomodoroSession {
     difficulty: u8,
     state: State,
     session_service: SessionService,
+    show_past_sessions: bool,
 }
 
 // Provides the default initial state for the application.
@@ -48,6 +49,7 @@ impl PomodoroSession {
             difficulty: 3, // Default to medium
             state: State::Canceled,
             session_service,
+            show_past_sessions: true,
         }
     }
 }
@@ -58,6 +60,10 @@ impl eframe::App for PomodoroSession {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(Duration::from_millis(1000));
         ctx.set_pixels_per_point(2.5);
+
+        if ctx.input(|i| i.key_pressed(egui::Key::T)) {
+            self.show_past_sessions = !self.show_past_sessions;
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // This layout centers the frame that contains all our widgets.
@@ -196,7 +202,7 @@ impl PomodoroSession {
 
     fn draw_session_table(&mut self, ui: &mut egui::Ui) {
         ui.add_space(20.0);
-        egui::CollapsingHeader::new("Past Sessions").show(ui, |ui| {
+        egui::CollapsingHeader::new("Past Sessions").open(Some(self.show_past_sessions)).show(ui, |ui| {
             ui.add_space(10.0);
 
             use chrono::prelude::*;

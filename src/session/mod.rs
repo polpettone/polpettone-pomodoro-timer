@@ -16,6 +16,13 @@ fn default_difficulty() -> u8 {
     3
 }
 
+pub trait SessionRepository {
+    fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>>;
+    fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>>;
+    fn init_session_dir(&self) -> Result<(), Box<dyn Error>>;
+    fn get_status_file_path(&self) -> PathBuf;
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
     pub description: String,
@@ -41,41 +48,24 @@ impl Session {
     }
 }
 
-pub struct SessionService {
+use std::path::PathBuf;
+
+pub struct FileSystemSessionRepository {
     pub pomodoro_session_dir: String,
 }
 
-impl SessionService {
-    pub fn start_session(
-        &self,
-        description: &str,
-        duration_seconds: u64,
-        difficulty: u8,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let start = SystemTime::now();
-        let start_date: DateTime<Utc> = start.into();
+impl SessionRepository for FileSystemSessionRepository {
+    fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
+        let filename = format!("{}-session.yaml", session.start.format("%Y%m%d%H%M%S"));
+        let filepath = Path::new(&self.pomodoro_session_dir).join(filename);
 
-        println!("Using {}", &self.pomodoro_session_dir);
-
-        let session_dir = &self.pomodoro_session_dir;
-
-        let session = Session {
-            description: description.to_string(),
-            duration: Duration::new(duration_seconds, 0),
-            difficulty,
-            start: start_date,
-        };
-
-        serialize_session(&session, session_dir, start_date)?;
+        let serialized = serde_yaml::to_string(&session)?;
+        let mut file = File::create(filepath)?;
+        file.write_all(serialized.as_bytes())?;
         Ok(())
     }
 
-    pub fn init_session_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
-        fs::create_dir_all(&self.pomodoro_session_dir)?;
-        Ok(())
-    }
-
-    pub fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
+    fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
         let mut sessions = Vec::new();
         let paths = fs::read_dir(&self.pomodoro_session_dir)?;
 
@@ -92,8 +82,56 @@ impl SessionService {
         Ok(sessions)
     }
 
+    fn init_session_dir(&self) -> Result<(), Box<dyn Error>> {
+        fs::create_dir_all(&self.pomodoro_session_dir)?;
+        Ok(())
+    }
+
+    fn get_status_file_path(&self) -> PathBuf {
+        PathBuf::from(&self.pomodoro_session_dir).join("status")
+    }
+}
+
+pub struct SessionService {
+    repository: Box<dyn SessionRepository>,
+}
+
+impl SessionService {
+    pub fn new(repository: Box<dyn SessionRepository>) -> Self {
+        SessionService { repository }
+    }
+
+    pub fn start_session(
+        &self,
+        description: &str,
+        duration_seconds: u64,
+        difficulty: u8,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let start = SystemTime::now();
+        let start_date: DateTime<Utc> = start.into();
+
+        let session = Session {
+            description: description.to_string(),
+            duration: Duration::new(duration_seconds, 0),
+            difficulty,
+            start: start_date,
+        };
+
+        self.repository.save_session(&session)?;
+        Ok(())
+    }
+
+    pub fn init_session_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.repository.init_session_dir()?;
+        Ok(())
+    }
+
+    pub fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
+        self.repository.load_sessions()
+    }
+
     pub fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
-        let sessions = self.load_sessions()?;
+        let sessions = self.repository.load_sessions()?;
         let now = Utc::now();
         let mut active_sessions: Vec<Session> = sessions
             .into_iter()
@@ -111,7 +149,7 @@ impl SessionService {
                 let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
-                    .open(self.pomodoro_session_dir.clone() + "status")?;
+                    .open(self.repository.get_status_file_path())?;
 
                 writeln!(
                     file,
@@ -131,7 +169,7 @@ impl SessionService {
         range_end: DateTime<Utc>,
         search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
-        let sessions = self.load_sessions()?;
+        let sessions = self.repository.load_sessions()?;
         let sessions_in_range = sessions
             .into_iter()
             .filter(|session| {
@@ -152,18 +190,4 @@ impl SessionService {
             .collect();
         Ok(sessions_in_range)
     }
-}
-
-fn serialize_session(
-    session: &Session,
-    session_dir: &str,
-    start_date: DateTime<Utc>,
-) -> Result<(), Box<dyn Error>> {
-    let filename = format!("{}-session.yaml", start_date.format("%Y%m%d%H%M%S"));
-    let filepath = Path::new(session_dir).join(filename);
-
-    let serialized = serde_yaml::to_string(&session)?;
-    let mut file = File::create(filepath)?;
-    file.write_all(serialized.as_bytes())?;
-    Ok(())
 }

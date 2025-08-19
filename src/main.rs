@@ -7,7 +7,7 @@ mod gui;
 mod session;
 
 use crate::config::Config;
-use crate::session::SessionService;
+use crate::session::{SessionService, FileSystemSessionRepository};
 
 use command::Command;
 use dirs::home_dir;
@@ -81,9 +81,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let session_service = SessionService {
+    let session_repository = FileSystemSessionRepository {
         pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
     };
+
+    let session_service = SessionService::new(Box::new(session_repository));
 
     match opts.cmd {
         Command::Gui => {

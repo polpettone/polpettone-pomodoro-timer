@@ -30,6 +30,8 @@ enum State {
     Canceled,
 }
 
+use crate::session::Session;
+
 // Holds the entire state of our application.
 struct PomodoroSession {
     name: String,
@@ -38,6 +40,7 @@ struct PomodoroSession {
     state: State,
     session_service: SessionService,
     show_past_sessions: bool,
+    current_session: Option<Session>,
 }
 
 // Provides the default initial state for the application.
@@ -50,6 +53,7 @@ impl PomodoroSession {
             state: State::Canceled,
             session_service,
             show_past_sessions: true,
+            current_session: None,
         }
     }
 }
@@ -60,6 +64,20 @@ impl eframe::App for PomodoroSession {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(Duration::from_millis(1000));
         ctx.set_pixels_per_point(2.5);
+
+        if let Ok(mut sessions) = self.session_service.find_all_active_sessions() {
+            if let Some(session) = sessions.pop() {
+                self.current_session = Some(session);
+            } else {
+                self.current_session = None;
+            }
+        }
+
+        if let Some(session) = &self.current_session {
+            self.name = session.description.clone();
+            self.minutes = (session.duration.as_secs() / 60) as u32;
+            self.difficulty = session.difficulty;
+        }
 
         if ctx.input(|i| i.key_pressed(egui::Key::T)) {
             self.show_past_sessions = !self.show_past_sessions;
@@ -136,6 +154,13 @@ impl PomodoroSession {
                 .text_edit_singleline(&mut self.name)
                 .labelled_by(name_label.id);
 
+            if response.changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.description = self.name.clone();
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
+
             if ctx.input(|i| i.key_pressed(egui::Key::F)) && !response.has_focus() {
                 response.request_focus();
             }
@@ -146,7 +171,14 @@ impl PomodoroSession {
     /// Draws the "Minutes" slider and handles mouse wheel input.
     fn draw_duration_slider(&mut self, ui: &mut egui::Ui) {
         let slider = egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes");
-        let _response = ui.add(slider);
+        let response = ui.add(slider);
+
+        if response.changed() {
+            if let Some(session) = &mut self.current_session {
+                session.duration = Duration::from_secs(self.minutes as u64 * 60);
+                let _ = self.session_service.save_or_update_session(session);
+            }
+        }
 
         // Allow mouse wheel to control the slider when hovered.
         let scroll = ui.input(|i| i.raw_scroll_delta);
@@ -162,11 +194,36 @@ impl PomodoroSession {
     fn draw_difficulty_selector(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Difficulty:");
-            ui.radio_value(&mut self.difficulty, 1, "1");
-            ui.radio_value(&mut self.difficulty, 2, "2");
-            ui.radio_value(&mut self.difficulty, 3, "3");
-            ui.radio_value(&mut self.difficulty, 4, "4");
-            ui.radio_value(&mut self.difficulty, 5, "5");
+            if ui.radio_value(&mut self.difficulty, 1, "1").changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.difficulty = self.difficulty;
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
+            if ui.radio_value(&mut self.difficulty, 2, "2").changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.difficulty = self.difficulty;
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
+            if ui.radio_value(&mut self.difficulty, 3, "3").changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.difficulty = self.difficulty;
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
+            if ui.radio_value(&mut self.difficulty, 4, "4").changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.difficulty = self.difficulty;
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
+            if ui.radio_value(&mut self.difficulty, 5, "5").changed() {
+                if let Some(session) = &mut self.current_session {
+                    session.difficulty = self.difficulty;
+                    let _ = self.session_service.save_or_update_session(session);
+                }
+            }
         });
         ui.add_space(20.0);
     }
@@ -191,9 +248,13 @@ impl PomodoroSession {
             // Toggle the state when the button is activated.
             self.state = match self.state {
                 State::Canceled => {
-                    let _ =
-                        self.session_service
-                            .start_session(&self.name, 25 * 60, self.difficulty);
+                    if let Ok(session) = self.session_service.create_session(
+                        &self.name,
+                        (self.minutes * 60) as u64,
+                        self.difficulty,
+                    ) {
+                        self.current_session = Some(session);
+                    }
                     State::Running
                 }
                 State::Running => State::Canceled,

@@ -140,12 +140,16 @@ impl SessionService {
         SessionService { repository }
     }
 
-    pub fn start_session(
+    pub fn save_or_update_session(&self, session: &Session) -> Result<(), Box<dyn std::error::Error>> {
+        self.repository.save_or_update_session(session)
+    }
+
+    pub fn create_session(
         &self,
         description: &str,
         duration_seconds: u64,
         difficulty: u8,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<Session, Box<dyn std::error::Error>> {
         let session = Session::new(
             description.to_string(),
             Duration::new(duration_seconds, 0),
@@ -153,7 +157,7 @@ impl SessionService {
         );
 
         self.repository.save_or_update_session(&session)?;
-        Ok(())
+        Ok(session)
     }
 
     pub fn init_session_dir(&self) -> Result<(), Box<dyn std::error::Error>> {

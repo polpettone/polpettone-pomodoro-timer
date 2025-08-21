@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Duration: {} minutes", duration);
             println!("Description: {}", description);
 
-            session_service.start_session(&description, duration * 60, difficulty)?;
+            session_service.create_session(&description, duration * 60, difficulty)?;
         }
         Command::Active => {
             println!("Showing all sessions");

@@ -9,10 +9,10 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::date_time::{deserialize_human_readable, duration_in_minutes, serialize_human_readable};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fs::OpenOptions;
 use std::io;
 use uuid::Uuid;
-use serde_with::{serde_as, DisplayFromStr};
 
 fn default_difficulty() -> u8 {
     3
@@ -20,6 +20,10 @@ fn default_difficulty() -> u8 {
 
 fn generate_uuid() -> Uuid {
     Uuid::new_v4()
+}
+
+fn default_canceled() -> bool {
+    false
 }
 
 pub trait SessionRepository {
@@ -36,6 +40,8 @@ pub struct Session {
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "generate_uuid")]
     pub id: Uuid,
+    #[serde(default = "default_canceled")]
+    pub canceled: bool,
     pub description: String,
     pub duration: Duration,
     // difficulty from 1 to 5
@@ -49,13 +55,10 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(
-        description: String,
-        duration: Duration,
-        difficulty: u8,
-    ) -> Self {
+    pub fn new(description: String, duration: Duration, difficulty: u8) -> Self {
         Session {
             id: Uuid::new_v4(),
+            canceled: false,
             description,
             duration,
             difficulty,
@@ -103,7 +106,6 @@ impl SessionRepository for FileSystemSessionRepository {
         Ok(Some(session))
     }
 
-
     fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
         let mut sessions = Vec::new();
         let paths = fs::read_dir(&self.pomodoro_session_dir)?;
@@ -140,7 +142,10 @@ impl SessionService {
         SessionService { repository }
     }
 
-    pub fn save_or_update_session(&self, session: &Session) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_or_update_session(
+        &self,
+        session: &Session,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.repository.save_or_update_session(session)
     }
 
@@ -169,7 +174,10 @@ impl SessionService {
         self.repository.load_sessions()
     }
 
-    pub fn load_session_by_id(&self, id: &Uuid) -> Result<Option<Session>, Box<dyn std::error::Error>> {
+    pub fn load_session_by_id(
+        &self,
+        id: &Uuid,
+    ) -> Result<Option<Session>, Box<dyn std::error::Error>> {
         self.repository.load_session_by_id(id)
     }
 
@@ -179,6 +187,7 @@ impl SessionService {
         let mut active_sessions: Vec<Session> = sessions
             .into_iter()
             .filter(|session| session.start + session.duration > now)
+            .filter(|session| !session.canceled)
             .collect();
 
         active_sessions.sort_by(|a, b| b.start.cmp(&a.start));

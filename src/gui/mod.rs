@@ -128,10 +128,10 @@ impl PomodoroSession {
             Ok(sessions) => {
                 if let Some(session) = sessions.get(0) {
                     let timer_text = format!(
-                        "{}: \n {} - {}",
-                        session.description,
+                        "{} - {} \n {}",
                         duration_in_minutes(session.duration),
-                        duration_in_minutes(session.elapsed_duration())
+                        duration_in_minutes(session.elapsed_duration()),
+                        session.description
                     );
                     ui.heading(
                         egui::RichText::new(timer_text).font(egui::FontId::proportional(30.0)),

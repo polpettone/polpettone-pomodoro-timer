@@ -1,5 +1,5 @@
 use crate::date_time::duration_in_minutes;
-use crate::session::{Session, SessionService};
+use crate::session::SessionService;
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 use std::time::Duration;
@@ -132,7 +132,8 @@ impl PomodoroSession {
     fn draw_session_input(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             let name_label = ui.label("Session: ");
-            let response = ui.text_edit_singleline(&mut self.name)
+            let response = ui
+                .text_edit_singleline(&mut self.name)
                 .labelled_by(name_label.id);
 
             if ctx.input(|i| i.key_pressed(egui::Key::F)) && !response.has_focus() {
@@ -202,68 +203,69 @@ impl PomodoroSession {
 
     fn draw_session_table(&mut self, ui: &mut egui::Ui) {
         ui.add_space(20.0);
-        egui::CollapsingHeader::new("Past Sessions").open(Some(self.show_past_sessions)).show(ui, |ui| {
-            ui.add_space(10.0);
+        egui::CollapsingHeader::new("Past Sessions")
+            .open(Some(self.show_past_sessions))
+            .show(ui, |ui| {
+                ui.add_space(10.0);
 
-            use chrono::prelude::*;
-            let now = Utc::now();
-            let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-            let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
-
-            if let Ok(sessions) = self
-                .session_service
-                .find_sessions_in_range(start, end, None)
-            {
+                use chrono::prelude::*;
                 let now = Utc::now();
-                let mut past_sessions: Vec<&Session> = sessions
-                    .iter()
-                    .filter(|s| s.start + s.duration <= now)
-                    .collect();
+                let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+                let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-                past_sessions.sort_by(|a, b| b.start.cmp(&a.start));
+                if let Ok(mut sessions) = self
+                    .session_service
+                    .find_sessions_in_range(start, end, None)
+                {
+                    sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
-                let table = TableBuilder::new(ui)
-                    .striped(true)
-                    .resizable(true)
-                    .column(Column::auto())
-                    .column(Column::auto())
-                    .column(Column::auto())
-                    .column(Column::remainder());
+                    let table = TableBuilder::new(ui)
+                        .striped(true)
+                        .resizable(true)
+                        .column(Column::auto())
+                        .column(Column::auto())
+                        .column(Column::auto())
+                        .column(Column::remainder());
 
-                table
-                    .header(20.0, |mut header| {
-                        header.col(|ui| {
-                            ui.strong("Start Time");
-                        });
-                        header.col(|ui| {
-                            ui.strong("Description");
-                        });
-                        header.col(|ui| {
-                            ui.strong("Duration");
-                        });
-                        header.col(|ui| {
-                            ui.strong("D");
-                        });
-                    })
-                    .body(|mut body| {
-                        for session in past_sessions.iter() {
-                            body.row(30.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.label(session.start.format("%Y-%m-%d %H:%M").to_string());
-                                });
-                                row.col(|ui| {
-                                    ui.label(session.description.to_string());
-                                });
-                                row.col(|ui| {
-                                    ui.label(format!("{} min", session.duration.as_secs() / 60));
-                                });
-                                row.col(|ui| {
-                                    ui.label(format!("{}", session.difficulty));
-                                });
+                    table
+                        .header(20.0, |mut header| {
+                            header.col(|ui| {
+                                ui.strong("Start Time");
                             });
-                        }
-                    });
-            }
-        });
+                            header.col(|ui| {
+                                ui.strong("Description");
+                            });
+                            header.col(|ui| {
+                                ui.strong("Duration");
+                            });
+                            header.col(|ui| {
+                                ui.strong("D");
+                            });
+                        })
+                        .body(|mut body| {
+                            for session in sessions.iter() {
+                                body.row(30.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label(
+                                            session.start.format("%Y-%m-%d %H:%M").to_string(),
+                                        );
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(session.description.to_string());
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(format!(
+                                            "{} min",
+                                            session.duration.as_secs() / 60
+                                        ));
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(format!("{}", session.difficulty));
+                                    });
+                                });
+                            }
+                        });
+                }
+            });
     }
 }

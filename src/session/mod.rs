@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use std::error::Error;
@@ -11,9 +11,15 @@ use std::path::Path;
 use crate::date_time::{deserialize_human_readable, duration_in_minutes, serialize_human_readable};
 use std::fs::OpenOptions;
 use std::io;
+use uuid::Uuid;
+use serde_with::{serde_as, DisplayFromStr};
 
 fn default_difficulty() -> u8 {
     3
+}
+
+fn generate_uuid() -> Uuid {
+    Uuid::new_v4()
 }
 
 pub trait SessionRepository {
@@ -23,8 +29,12 @@ pub trait SessionRepository {
     fn get_status_file_path(&self) -> PathBuf;
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Session {
+    #[serde_as(as = "DisplayFromStr")]
+    #[serde(default = "generate_uuid")]
+    pub id: Uuid,
     pub description: String,
     pub duration: Duration,
     // difficulty from 1 to 5
@@ -38,6 +48,20 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn new(
+        description: String,
+        duration: Duration,
+        difficulty: u8,
+    ) -> Self {
+        Session {
+            id: Uuid::new_v4(),
+            description,
+            duration,
+            difficulty,
+            start: Utc::now(),
+        }
+    }
+
     pub fn elapsed_duration(&self) -> Duration {
         let now = Utc::now();
         let duration_since_start = now.signed_duration_since(self.start);
@@ -56,7 +80,7 @@ pub struct FileSystemSessionRepository {
 
 impl SessionRepository for FileSystemSessionRepository {
     fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
-        let filename = format!("{}-session.yaml", session.start.format("%Y%m%d%H%M%S"));
+        let filename = format!("{}.yaml", session.id);
         let filepath = Path::new(&self.pomodoro_session_dir).join(filename);
 
         let serialized = serde_yaml::to_string(&session)?;
@@ -107,15 +131,11 @@ impl SessionService {
         duration_seconds: u64,
         difficulty: u8,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let start = SystemTime::now();
-        let start_date: DateTime<Utc> = start.into();
-
-        let session = Session {
-            description: description.to_string(),
-            duration: Duration::new(duration_seconds, 0),
+        let session = Session::new(
+            description.to_string(),
+            Duration::new(duration_seconds, 0),
             difficulty,
-            start: start_date,
-        };
+        );
 
         self.repository.save_session(&session)?;
         Ok(())

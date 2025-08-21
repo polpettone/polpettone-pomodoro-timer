@@ -7,7 +7,7 @@ use std::time::Duration;
 // The public function that starts and runs the GUI.
 pub fn show(session_service: SessionService) -> eframe::Result {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([420.0, 540.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([520.0, 540.0]),
         ..Default::default()
     };
 
@@ -111,17 +111,22 @@ impl PomodoroSession {
     fn draw_main_ui(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         // This vertical layout stacks all our widgets and constrains their width.
         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-            ui.set_width(280.0);
+            ui.set_width(420.0);
 
             self.draw_header(ui);
+
             self.draw_session_input(ui, ctx);
 
-            if self.state != State::Running {
-                self.draw_duration_slider(ui);
-            }
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    if self.state != State::Running {
+                        self.draw_duration_slider(ui);
+                    }
+                    self.draw_difficulty_selector(ui);
+                });
+                self.draw_action_button(ui, ctx);
+            });
 
-            self.draw_difficulty_selector(ui);
-            self.draw_action_button(ui, ctx);
             self.draw_session_table(ui);
         });
     }
@@ -144,6 +149,10 @@ impl PomodoroSession {
                     ui.add_space(25.0);
                 } else {
                     self.state = State::Canceled;
+                    let timer_text = format!("{} - {} \n {}", "00:00", "00:00", "Nix");
+                    ui.heading(
+                        egui::RichText::new(timer_text).font(egui::FontId::proportional(30.0)),
+                    );
                 }
             }
 
@@ -231,8 +240,8 @@ impl PomodoroSession {
     /// Draws the main action button and handles its state-changing logic for clicks and spacebar presses.
     fn draw_action_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let button_text_str = match self.state {
-            State::Running => "Cancel",
-            State::Canceled => "Run",
+            State::Running => "■",
+            State::Canceled => "▶",
         };
 
         let button_text =
@@ -301,13 +310,13 @@ impl PomodoroSession {
                                 ui.strong("Start Time");
                             });
                             header.col(|ui| {
-                                ui.strong("Description");
+                                ui.strong("D");
                             });
                             header.col(|ui| {
                                 ui.strong("Duration");
                             });
                             header.col(|ui| {
-                                ui.strong("D");
+                                ui.strong("Description");
                             });
                         })
                         .body(|mut body| {
@@ -319,7 +328,7 @@ impl PomodoroSession {
                                         );
                                     });
                                     row.col(|ui| {
-                                        ui.label(session.description.to_string());
+                                        ui.label(format!("{}", session.difficulty));
                                     });
                                     row.col(|ui| {
                                         ui.label(format!(
@@ -328,7 +337,7 @@ impl PomodoroSession {
                                         ));
                                     });
                                     row.col(|ui| {
-                                        ui.label(format!("{}", session.difficulty));
+                                        ui.label(session.description.to_string());
                                     });
                                 });
                             }

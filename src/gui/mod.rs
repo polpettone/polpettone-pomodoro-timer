@@ -115,7 +115,11 @@ impl PomodoroSession {
 
             self.draw_header(ui);
             self.draw_session_input(ui, ctx);
-            self.draw_duration_slider(ui);
+
+            if self.state != State::Running {
+                self.draw_duration_slider(ui);
+            }
+
             self.draw_difficulty_selector(ui);
             self.draw_action_button(ui, ctx);
             self.draw_session_table(ui);
@@ -123,10 +127,11 @@ impl PomodoroSession {
     }
 
     /// Draws the main title heading.
-    fn draw_header(&self, ui: &mut egui::Ui) {
+    fn draw_header(&mut self, ui: &mut egui::Ui) {
         match self.session_service.find_all_active_sessions() {
             Ok(sessions) => {
                 if let Some(session) = sessions.get(0) {
+                    self.state = State::Running;
                     let timer_text = format!(
                         "{} - {} \n {}",
                         duration_in_minutes(session.duration),
@@ -137,6 +142,8 @@ impl PomodoroSession {
                         egui::RichText::new(timer_text).font(egui::FontId::proportional(30.0)),
                     );
                     ui.add_space(25.0);
+                } else {
+                    self.state = State::Canceled;
                 }
             }
 

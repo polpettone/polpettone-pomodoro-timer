@@ -168,19 +168,19 @@ impl PomodoroSession {
         ui.add_space(10.0);
     }
 
-    /// Draws the "Minutes" slider and handles mouse wheel input.
     fn draw_duration_slider(&mut self, ui: &mut egui::Ui) {
         let slider = egui::Slider::new(&mut self.minutes, 0..=60).text("Minutes");
-        let _ = ui.add(slider);
+        let response = ui.add(slider);
 
-        // Allow mouse wheel to control the slider when hovered.
-        let scroll = ui.input(|i| i.raw_scroll_delta);
-        if scroll.y > 0.0 && self.minutes < 60 {
-            self.minutes += 1;
-        } else if scroll.y < 0.0 && self.minutes > 0 {
-            self.minutes -= 1;
+        if response.hovered() {
+            let scroll = ui.input(|i| i.raw_scroll_delta);
+            if scroll.y > 0.0 && self.minutes < 60 {
+                self.minutes += 1;
+            } else if scroll.y < 0.0 && self.minutes > 0 {
+                self.minutes -= 1;
+            }
+            ui.add_space(10.0);
         }
-        ui.add_space(10.0);
     }
 
     /// Draws the "Difficulty" radio buttons.

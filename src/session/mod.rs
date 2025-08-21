@@ -23,8 +23,9 @@ fn generate_uuid() -> Uuid {
 }
 
 pub trait SessionRepository {
-    fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>>;
+    fn save_or_update_session(&self, session: &Session) -> Result<(), Box<dyn Error>>;
     fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>>;
+    fn load_session_by_id(&self, id: &Uuid) -> Result<Option<Session>, Box<dyn Error>>;
     fn init_session_dir(&self) -> Result<(), Box<dyn Error>>;
     fn get_status_file_path(&self) -> PathBuf;
 }
@@ -79,7 +80,7 @@ pub struct FileSystemSessionRepository {
 }
 
 impl SessionRepository for FileSystemSessionRepository {
-    fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
+    fn save_or_update_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
         let filename = format!("{}.yaml", session.id);
         let filepath = Path::new(&self.pomodoro_session_dir).join(filename);
 
@@ -88,6 +89,20 @@ impl SessionRepository for FileSystemSessionRepository {
         file.write_all(serialized.as_bytes())?;
         Ok(())
     }
+
+    fn load_session_by_id(&self, id: &Uuid) -> Result<Option<Session>, Box<dyn Error>> {
+        let filename = format!("{}.yaml", id);
+        let filepath = Path::new(&self.pomodoro_session_dir).join(filename);
+
+        if !filepath.exists() {
+            return Ok(None);
+        }
+
+        let contents = fs::read_to_string(&filepath)?;
+        let session: Session = serde_yaml::from_str(&contents)?;
+        Ok(Some(session))
+    }
+
 
     fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
         let mut sessions = Vec::new();
@@ -137,7 +152,7 @@ impl SessionService {
             difficulty,
         );
 
-        self.repository.save_session(&session)?;
+        self.repository.save_or_update_session(&session)?;
         Ok(())
     }
 
@@ -148,6 +163,10 @@ impl SessionService {
 
     pub fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {
         self.repository.load_sessions()
+    }
+
+    pub fn load_session_by_id(&self, id: &Uuid) -> Result<Option<Session>, Box<dyn std::error::Error>> {
+        self.repository.load_session_by_id(id)
     }
 
     pub fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn std::error::Error>> {

@@ -7,7 +7,7 @@ mod gui;
 mod session;
 
 use crate::config::Config;
-use crate::session::{SessionService, FileSystemSessionRepository};
+use crate::session::{FileSystemSessionRepository, SessionService};
 
 use command::Command;
 use dirs::home_dir;
@@ -90,7 +90,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     match opts.cmd {
         Command::Gui => {
             let _ = gui::show(session_service);
-            println!("gui not implemented yet");
         }
 
         Command::InitSessionDir => {

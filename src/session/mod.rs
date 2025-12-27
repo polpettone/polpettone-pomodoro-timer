@@ -13,7 +13,7 @@ use crate::date_time::{deserialize_human_readable, duration_in_minutes, serializ
 use std::fs::OpenOptions;
 use std::io;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
     pub description: String,
     pub duration: Duration,

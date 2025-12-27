@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -26,6 +27,7 @@ pub enum Mode {
 
 pub struct App {
     sessions: Vec<Session>,
+    pub filtered_sessions: Vec<Session>,
     pub date_input: String,
     pub mode: Mode,
 }
@@ -33,10 +35,56 @@ pub struct App {
 impl App {
     pub fn new(sessions: Vec<Session>) -> App {
         App {
+            filtered_sessions: sessions.clone(),
             sessions,
             date_input: String::new(),
             mode: Mode::Navigation,
         }
+    }
+
+    pub fn filter_sessions(&mut self) {
+        let input = self.date_input.trim();
+        if input.is_empty() {
+            self.filtered_sessions = self.sessions.clone();
+            return;
+        }
+
+        // Try range: "YYYY-MM-DD - YYYY-MM-DD"
+        if input.contains(" - ") {
+            let parts: Vec<&str> = input.split(" - ").collect();
+            if parts.len() == 2 {
+                if let (Ok(start), Ok(end)) = (
+                    NaiveDate::parse_from_str(parts[0], "%Y-%m-%d"),
+                    NaiveDate::parse_from_str(parts[1], "%Y-%m-%d"),
+                ) {
+                    self.filtered_sessions = self
+                        .sessions
+                        .iter()
+                        .filter(|s| {
+                            let d = s.start.date_naive();
+                            d >= start && d <= end
+                        })
+                        .cloned()
+                        .collect();
+                    return;
+                }
+            }
+        }
+
+        // Try single date: "YYYY-MM-DD"
+        if let Ok(date) = NaiveDate::parse_from_str(input, "%Y-%m-%d") {
+            self.filtered_sessions = self
+                .sessions
+                .iter()
+                .filter(|s| s.start.date_naive() == date)
+                .cloned()
+                .collect();
+            return;
+        }
+
+        // Invalid format: show empty or keep all? 
+        // Showing empty clearly indicates "no match" for the current filter.
+        self.filtered_sessions = vec![];
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
@@ -58,9 +106,13 @@ impl App {
                         _ => {}
                     },
                     Mode::Input(InputField::Date) => match key.code {
-                        KeyCode::Char(c) => self.date_input.push(c),
+                        KeyCode::Char(c) => {
+                            self.date_input.push(c);
+                            self.filter_sessions();
+                        }
                         KeyCode::Backspace => {
                             self.date_input.pop();
+                            self.filter_sessions();
                         }
                         KeyCode::Esc => self.mode = Mode::Navigation,
                         _ => {}
@@ -109,7 +161,7 @@ impl App {
 
         // --- Session List ---
         let items: Vec<ListItem> = self
-            .sessions
+            .filtered_sessions
             .iter()
             .map(|s| ListItem::new(s.to_string()))
             .collect();

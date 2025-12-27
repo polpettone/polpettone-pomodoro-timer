@@ -4,6 +4,7 @@ mod config;
 mod date_time;
 mod display;
 mod session;
+mod tui;
 
 use crate::config::Config;
 use crate::session::SessionService;
@@ -18,6 +19,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
+use tui::app::App;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -85,6 +87,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     match opts.cmd {
+        Command::Tui => {
+            let sessions = session_service.find_all_active_sessions()?;
+            let mut app = App::new(sessions);
+            app.run()?;
+        }
         Command::InitSessionDir => {
             println!("init session dir");
             session_service.init_session_dir()?;

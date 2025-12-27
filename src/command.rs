@@ -5,6 +5,7 @@ pub enum Command {
     InitSessionDir,
     Active,
     Watch,
+    Tui,
     Start {
         /// Duration in minutes
         #[structopt(short = "t", long = "duration", default_value = "25")]

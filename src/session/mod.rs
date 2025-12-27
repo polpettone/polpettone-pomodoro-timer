@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
+use std::fmt;
 
 use chrono::{DateTime, Utc};
 use std::error::Error;
@@ -21,6 +22,18 @@ pub struct Session {
         deserialize_with = "deserialize_human_readable"
     )]
     pub start: DateTime<Utc>,
+}
+
+impl fmt::Display for Session {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} - started at: {}, duration: {} minutes",
+            self.description,
+            self.start.format("%Y-%m-%d %H:%M:%S"),
+            self.duration.as_secs() / 60
+        )
+    }
 }
 
 impl Session {

@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match opts.cmd {
         Command::Tui => {
-            let sessions = session_service.find_all_active_sessions()?;
+            let sessions = session_service.load_sessions()?;
             let mut app = App::new(sessions);
             app.run()?;
         }

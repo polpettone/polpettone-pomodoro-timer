@@ -22,14 +22,16 @@ pub struct Session {
         deserialize_with = "deserialize_human_readable"
     )]
     pub start: DateTime<Utc>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl fmt::Display for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} {} min | {}",
-            self.start.format("%Y-%m-%d %H:%M:%S"),
+            "{} - {} minutes - {}",
+            self.start.format("%Y-%m-%d"),
             self.duration.as_secs() / 60,
             self.description
         )
@@ -68,6 +70,7 @@ impl SessionService {
             description: description.to_string(),
             duration: Duration::new(duration_seconds, 0),
             start: start_date,
+            tags: Vec::new(),
         };
 
         serialize_session(&session, session_dir, start_date)?;
@@ -155,7 +158,7 @@ impl SessionService {
     }
 }
 
-fn serialize_session(
+pub fn serialize_session(
     session: &Session,
     session_dir: &str,
     start_date: DateTime<Utc>,

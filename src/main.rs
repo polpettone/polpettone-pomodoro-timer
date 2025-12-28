@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match opts.cmd {
         Command::Tui => {
             let sessions = session_service.load_sessions()?;
-            let mut app = App::new(sessions);
+            let mut app = App::new(sessions, session_service.pomodoro_session_dir.clone());
             app.run()?;
         }
         Command::InitSessionDir => {

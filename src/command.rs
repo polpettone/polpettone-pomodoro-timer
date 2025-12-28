@@ -7,11 +7,9 @@ pub enum Command {
     Watch,
     Tui,
     Start {
-        /// Duration in minutes
         #[structopt(short = "t", long = "duration", default_value = "25")]
         duration: u64,
 
-        /// Description of this session
         #[structopt(short = "d", long = "description", default_value = "no description")]
         description: String,
     },

@@ -36,6 +36,8 @@ pub struct Session {
     pub start: DateTime<Utc>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub notes: String,
     #[serde(default = "default_state")]
     pub state: SessionState,
 }
@@ -105,6 +107,7 @@ impl SessionService {
             duration: Duration::new(duration_seconds, 0),
             start: start_date,
             tags: Vec::new(),
+            notes: String::new(),
             state: SessionState::Running,
         };
 

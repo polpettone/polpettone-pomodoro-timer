@@ -17,7 +17,7 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 use crate::session::{serialize_session, Session, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | a: create | e: edit | c: cancel | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | a: create | e: edit | c: cancel | q: quit | Esc: back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -37,6 +37,7 @@ pub enum Mode {
     Navigation,
     Tagging,
     Creation(CreationField),
+    Notes,
 }
 
 pub struct App {
@@ -45,6 +46,7 @@ pub struct App {
     pub date_input: String,
     pub search_input: String,
     pub tags_input: String,
+    pub notes_input: String,
     
     // Creation fields
     pub creation_duration: String,
@@ -66,8 +68,6 @@ impl App {
                 let remaining = session.remaining_duration();
                 if remaining.as_secs() == 0 {
                     session.state = SessionState::Done;
-                    // We should save this change.
-                    // Ignoring error here for simplicity in constructor, or log it.
                     let _ = serialize_session(session, &session_dir, session.start);
                 }
             }
@@ -84,6 +84,7 @@ impl App {
             date_input: String::new(),
             search_input: String::new(),
             tags_input: String::new(),
+            notes_input: String::new(),
             creation_duration: String::new(),
             creation_description: String::new(),
             mode: Mode::Navigation,
@@ -129,7 +130,6 @@ impl App {
             .sessions
             .iter()
             .filter(|s| {
-                // Date Filter
                 let date_match = if date_query.is_empty() {
                     true
                 } else if date_query.contains(" - ") {
@@ -153,7 +153,6 @@ impl App {
                     false
                 };
 
-                // Search Filter (Fuzzy)
                 let search_match = if search_query.is_empty() {
                     true
                 } else {
@@ -177,7 +176,6 @@ impl App {
     fn save_tags(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
-                // Parse tags
                 let new_tags: Vec<String> = self
                     .tags_input
                     .split(',')
@@ -187,7 +185,6 @@ impl App {
 
                 selected_session.tags = new_tags.clone();
 
-                // Update in main session list
                 if let Some(original_session) = self
                     .sessions
                     .iter_mut()
@@ -196,7 +193,26 @@ impl App {
                     original_session.tags = new_tags;
                 }
 
-                // Persist to disk
+                serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn save_notes(&mut self) -> Result<(), Box<dyn Error>> {
+        if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
+                let new_notes = self.notes_input.clone();
+                selected_session.notes = new_notes.clone();
+
+                if let Some(original_session) = self
+                    .sessions
+                    .iter_mut()
+                    .find(|s| s.start == selected_session.start)
+                {
+                    original_session.notes = new_notes;
+                }
+
                 serialize_session(selected_session, &self.session_dir, selected_session.start)?;
             }
         }
@@ -209,7 +225,6 @@ impl App {
                 if selected_session.state == SessionState::Running {
                      selected_session.state = SessionState::Canceled;
                      
-                     // Update in main list
                      if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
                          original_session.state = SessionState::Canceled;
                      }
@@ -290,6 +305,7 @@ impl App {
             duration: Duration::from_secs(duration_mins * 60),
             start,
             tags: Vec::new(),
+            notes: String::new(),
             state: SessionState::Running,
         };
         
@@ -310,11 +326,6 @@ impl App {
         let mut terminal = Terminal::new(backend)?;
 
         loop {
-            // Check for expired running sessions to auto-update UI to "Done"
-            // We check this every loop to keep UI fresh
-            // Only update if something changed to avoid flicker or performance hit?
-            // Actually, calculating remaining time is cheap.
-            // But we should persist the "Done" state if it just transitioned.
             let mut changed = false;
             for session in self.sessions.iter_mut() {
                 if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
@@ -324,7 +335,7 @@ impl App {
                 }
             }
             if changed {
-                self.filter_sessions(); // Refresh filtered list
+                self.filter_sessions();
             }
 
             terminal.draw(|f| ui(f, self))?;
@@ -343,6 +354,14 @@ impl App {
                                     if let Some(session) = self.filtered_sessions.get(idx) {
                                         self.tags_input = session.tags.join(", ");
                                         self.mode = Mode::Tagging;
+                                    }
+                                }
+                            },
+                            KeyCode::Char('n') => {
+                                if let Some(idx) = self.list_state.selected() {
+                                    if let Some(session) = self.filtered_sessions.get(idx) {
+                                        self.notes_input = session.notes.clone();
+                                        self.mode = Mode::Notes;
                                     }
                                 }
                             }
@@ -398,6 +417,18 @@ impl App {
                             KeyCode::Esc => self.mode = Mode::Navigation,
                             _ => {}
                         },
+                        Mode::Notes => match key.code {
+                            KeyCode::Char(c) => self.notes_input.push(c),
+                            KeyCode::Backspace => {
+                                self.notes_input.pop();
+                            },
+                            KeyCode::Enter => {
+                                self.save_notes()?;
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Esc => self.mode = Mode::Navigation,
+                            _ => {}
+                        },
                         Mode::Creation(field) => match key.code {
                              KeyCode::Char(c) => match field {
                                 CreationField::Duration => self.creation_duration.push(c),
@@ -444,19 +475,18 @@ fn keybinds_bar() -> Paragraph<'static> {
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
-    // Define constraints based on mode
     let constraints = if let Mode::Creation(_) = app.mode {
         vec![
-            Constraint::Length(3), // Top Inputs (Date + Search)
-            Constraint::Length(3), // Creation Inputs (Duration + Description)
-            Constraint::Min(0),    // Main content
-            Constraint::Length(3), // Keybinds
+            Constraint::Length(3), 
+            Constraint::Length(3), 
+            Constraint::Min(0),    
+            Constraint::Length(3), 
         ]
     } else {
         vec![
-            Constraint::Length(3), // Top Inputs (Date + Search)
-            Constraint::Min(0),    // Main content
-            Constraint::Length(3), // Keybinds
+            Constraint::Length(3), 
+            Constraint::Min(0),    
+            Constraint::Length(3), 
         ]
     };
 
@@ -466,7 +496,6 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints(constraints)
         .split(f.area());
 
-    // Map chunks
     let top_chunk = chunks[0];
     let (creation_chunk, main_content_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
         (Some(chunks[1]), chunks[2], chunks[3])
@@ -474,7 +503,6 @@ fn ui(f: &mut Frame, app: &mut App) {
         (None, chunks[1], chunks[2])
     };
 
-    // --- Top Inputs Split (Date/Search) ---
     let top_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -489,7 +517,6 @@ fn ui(f: &mut Frame, app: &mut App) {
     let date_chunk = top_chunks[0];
     let search_chunk = top_chunks[1];
 
-    // --- Date Input ---
     let date_title = if let Mode::Input(InputField::Date) = app.mode {
         "Date (Active)"
     } else {
@@ -499,7 +526,6 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(date_title));
     f.render_widget(date_input, date_chunk);
 
-    // --- Search Input ---
     let search_title = if let Mode::Input(InputField::Search) = app.mode {
         "Search (Active)"
     } else {
@@ -509,8 +535,6 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(search_title));
     f.render_widget(search_input, search_chunk);
 
-
-    // --- Creation Inputs (If Active) ---
     if let Some(c_chunk) = creation_chunk {
         if let Mode::Creation(ref field) = app.mode {
              let creation_chunks = Layout::default()
@@ -537,8 +561,6 @@ fn ui(f: &mut Frame, app: &mut App) {
         }
     }
 
-
-    // --- Split Main Content (List + Tags) ---
     let content_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -551,16 +573,28 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(main_content_chunk);
     
     let list_chunk = content_chunks[0];
-    let tags_chunk = content_chunks[1];
+    let right_chunk = content_chunks[1];
 
-    // --- Session List ---
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ]
+            .as_ref()
+        )
+        .split(right_chunk);
+    
+    let tags_chunk = right_chunks[0];
+    let notes_chunk = right_chunks[1];
+
     let list_width = list_chunk.width.saturating_sub(5) as usize;
     let items: Vec<ListItem> = app
         .filtered_sessions
         .iter()
         .map(|s| {
             let base_text = s.to_string();
-            // Determine Right-aligned status text
             let status_text = match s.state {
                 SessionState::Running => {
                      let remaining = s.remaining_duration();
@@ -617,8 +651,35 @@ fn ui(f: &mut Frame, app: &mut App) {
         .wrap(ratatui::widgets::Wrap { trim: true });
     
     f.render_widget(tags_widget, tags_chunk);
+
+    // --- Notes Pane ---
+    let notes_title = if app.mode == Mode::Notes {
+        "Notes (Active)"
+    } else {
+        "Notes"
+    };
+
+    let notes_text = if app.mode == Mode::Notes {
+        app.notes_input.clone()
+    } else {
+        if let Some(idx) = app.list_state.selected() {
+            if let Some(session) = app.filtered_sessions.get(idx) {
+                session.notes.clone()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    };
+
+    let notes_widget = Paragraph::new(notes_text)
+        .block(Block::default().borders(Borders::ALL).title(notes_title))
+        .wrap(ratatui::widgets::Wrap { trim: true });
     
-    // --- Keybinds ---
+    f.render_widget(notes_widget, notes_chunk);
+    
+    
     f.render_widget(keybinds_bar(), keybinds_chunk);
 
     // --- Cursor ---
@@ -639,6 +700,12 @@ fn ui(f: &mut Frame, app: &mut App) {
              f.set_cursor_position((
                 tags_chunk.x + app.tags_input.len() as u16 + 1,
                 tags_chunk.y + 1,
+            ));
+        }
+        Mode::Notes => {
+             f.set_cursor_position((
+                notes_chunk.x + app.notes_input.len() as u16 + 1,
+                notes_chunk.y + 1,
             ));
         }
         Mode::Creation(CreationField::Duration) => {

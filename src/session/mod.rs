@@ -28,10 +28,10 @@ impl fmt::Display for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} - {}, {} min",
-            self.description,
+            "{} {} min | {}",
             self.start.format("%Y-%m-%d %H:%M:%S"),
-            self.duration.as_secs() / 60
+            self.duration.as_secs() / 60,
+            self.description
         )
     }
 }

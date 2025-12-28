@@ -17,7 +17,7 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 use crate::session::{serialize_session, Session, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | a: create | e: edit | c: cancel | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | a: create | e: edit | c: cancel | x: delete | q: quit | Esc: back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -38,6 +38,7 @@ pub enum Mode {
     Tagging,
     Creation(CreationField),
     Notes,
+    DeleteConfirm,
 }
 
 pub struct App {
@@ -130,6 +131,10 @@ impl App {
             .sessions
             .iter()
             .filter(|s| {
+                if s.state == SessionState::Deleted {
+                    return false;
+                }
+
                 let date_match = if date_query.is_empty() {
                     true
                 } else if date_query.contains(" - ") {
@@ -234,6 +239,25 @@ impl App {
             }
          }
          Ok(())
+    }
+
+    fn delete_session(&mut self) -> Result<(), Box<dyn Error>> {
+        if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get(selected_idx) {
+                // Mark as Deleted
+                let mut deleted_session = selected_session.clone();
+                deleted_session.state = SessionState::Deleted;
+
+                // Update main list
+                if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
+                    original_session.state = SessionState::Deleted;
+                }
+
+                serialize_session(&deleted_session, &self.session_dir, deleted_session.start)?;
+                self.filter_sessions();
+            }
+        }
+        Ok(())
     }
 
     fn handle_edit_session(
@@ -376,6 +400,11 @@ impl App {
                                 self.mode = Mode::Creation(CreationField::Duration);
                             }
                             KeyCode::Char('c') => self.cancel_session()?,
+                            KeyCode::Char('x') => {
+                                if self.list_state.selected().is_some() {
+                                    self.mode = Mode::DeleteConfirm;
+                                }
+                            },
                             KeyCode::Tab => {
                                 self.mode = Mode::Input(InputField::Search);
                             }
@@ -450,6 +479,16 @@ impl App {
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
                             _ => {}
+                        },
+                        Mode::DeleteConfirm => match key.code {
+                            KeyCode::Char('y') | KeyCode::Enter => {
+                                self.delete_session()?;
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Char('n') | KeyCode::Esc => {
+                                self.mode = Mode::Navigation;
+                            },
+                            _ => {}
                         }
                     }
                 }
@@ -482,6 +521,13 @@ fn ui(f: &mut Frame, app: &mut App) {
             Constraint::Min(0),    
             Constraint::Length(3), 
         ]
+    } else if app.mode == Mode::DeleteConfirm {
+        vec![
+            Constraint::Length(3), 
+            Constraint::Length(3), // Delete Confirm Bar
+            Constraint::Min(0),    
+            Constraint::Length(3), 
+        ]
     } else {
         vec![
             Constraint::Length(3), 
@@ -497,7 +543,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     let top_chunk = chunks[0];
-    let (creation_chunk, main_content_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
+    let (middle_chunk, main_content_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
+        (Some(chunks[1]), chunks[2], chunks[3])
+    } else if app.mode == Mode::DeleteConfirm {
         (Some(chunks[1]), chunks[2], chunks[3])
     } else {
         (None, chunks[1], chunks[2])
@@ -535,7 +583,8 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(search_title));
     f.render_widget(search_input, search_chunk);
 
-    if let Some(c_chunk) = creation_chunk {
+    // --- Middle Area (Creation or Delete Confirm) ---
+    if let Some(m_chunk) = middle_chunk {
         if let Mode::Creation(ref field) = app.mode {
              let creation_chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -546,7 +595,7 @@ fn ui(f: &mut Frame, app: &mut App) {
                     ]
                     .as_ref(),
                 )
-                .split(c_chunk);
+                .split(m_chunk);
 
              let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
              let desc_title = if let CreationField::Description = field { "Description (Active)" } else { "Description" };
@@ -558,6 +607,13 @@ fn ui(f: &mut Frame, app: &mut App) {
              let desc_input = Paragraph::new(app.creation_description.as_str())
                 .block(Block::default().borders(Borders::ALL).title(desc_title));
              f.render_widget(desc_input, creation_chunks[1]);
+        } else if app.mode == Mode::DeleteConfirm {
+            let confirm_text = "Are you sure you want to delete this session? (y/n)";
+            let confirm_paragraph = Paragraph::new(confirm_text)
+                .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+                .block(Block::default().borders(Borders::ALL).title("Delete Confirmation"))
+                .alignment(ratatui::layout::Alignment::Center);
+            f.render_widget(confirm_paragraph, m_chunk);
         }
     }
 
@@ -709,7 +765,7 @@ fn ui(f: &mut Frame, app: &mut App) {
             ));
         }
         Mode::Creation(CreationField::Duration) => {
-            if let Some(c_chunk) = creation_chunk {
+            if let Some(c_chunk) = middle_chunk {
                  let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -721,7 +777,7 @@ fn ui(f: &mut Frame, app: &mut App) {
             }
         }
         Mode::Creation(CreationField::Description) => {
-            if let Some(c_chunk) = creation_chunk {
+            if let Some(c_chunk) = middle_chunk {
                  let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())

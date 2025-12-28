@@ -397,7 +397,7 @@ impl App {
                                 } else {
                                     String::new()
                                 };
-                                self.mode = Mode::Creation(CreationField::Duration);
+                                self.mode = Mode::Creation(CreationField::Description);
                             }
                             KeyCode::Char('c') => self.cancel_session()?,
                             KeyCode::Char('x') => {
@@ -524,7 +524,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     } else if app.mode == Mode::DeleteConfirm {
         vec![
             Constraint::Length(3), 
-            Constraint::Length(3), // Delete Confirm Bar
+            Constraint::Length(3), 
             Constraint::Min(0),    
             Constraint::Length(3), 
         ]
@@ -583,30 +583,30 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(search_title));
     f.render_widget(search_input, search_chunk);
 
-    // --- Middle Area (Creation or Delete Confirm) ---
+    // --- Middle Area ---
     if let Some(m_chunk) = middle_chunk {
         if let Mode::Creation(ref field) = app.mode {
              let creation_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
                     [
-                        Constraint::Percentage(50), 
-                        Constraint::Percentage(50), 
+                        Constraint::Percentage(70), // Description on the left
+                        Constraint::Percentage(30), // Duration on the right
                     ]
                     .as_ref(),
                 )
                 .split(m_chunk);
 
-             let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
              let desc_title = if let CreationField::Description = field { "Description (Active)" } else { "Description" };
-             
-             let duration_input = Paragraph::new(app.creation_duration.as_str())
-                .block(Block::default().borders(Borders::ALL).title(duration_title));
-             f.render_widget(duration_input, creation_chunks[0]);
+             let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
              
              let desc_input = Paragraph::new(app.creation_description.as_str())
                 .block(Block::default().borders(Borders::ALL).title(desc_title));
-             f.render_widget(desc_input, creation_chunks[1]);
+             f.render_widget(desc_input, creation_chunks[0]);
+
+             let duration_input = Paragraph::new(app.creation_duration.as_str())
+                .block(Block::default().borders(Borders::ALL).title(duration_title));
+             f.render_widget(duration_input, creation_chunks[1]);
         } else if app.mode == Mode::DeleteConfirm {
             let confirm_text = "Are you sure you want to delete this session? (y/n)";
             let confirm_paragraph = Paragraph::new(confirm_text)
@@ -735,7 +735,6 @@ fn ui(f: &mut Frame, app: &mut App) {
     
     f.render_widget(notes_widget, notes_chunk);
     
-    
     f.render_widget(keybinds_bar(), keybinds_chunk);
 
     // --- Cursor ---
@@ -764,26 +763,26 @@ fn ui(f: &mut Frame, app: &mut App) {
                 notes_chunk.y + 1,
             ));
         }
-        Mode::Creation(CreationField::Duration) => {
-            if let Some(c_chunk) = middle_chunk {
+        Mode::Creation(CreationField::Description) => {
+            if let Some(m_chunk) = middle_chunk {
                  let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                    .split(c_chunk);
+                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+                    .split(m_chunk);
                  f.set_cursor_position((
-                    creation_chunks[0].x + app.creation_duration.len() as u16 + 1,
+                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
                     creation_chunks[0].y + 1,
                 ));
             }
         }
-        Mode::Creation(CreationField::Description) => {
-            if let Some(c_chunk) = middle_chunk {
+        Mode::Creation(CreationField::Duration) => {
+            if let Some(m_chunk) = middle_chunk {
                  let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                    .split(c_chunk);
+                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+                    .split(m_chunk);
                 f.set_cursor_position((
-                    creation_chunks[1].x + app.creation_description.len() as u16 + 1,
+                    creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
                     creation_chunks[1].y + 1,
                 ));
             }

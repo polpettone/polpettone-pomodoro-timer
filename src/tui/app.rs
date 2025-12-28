@@ -380,18 +380,26 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_chunk = content_chunks[1];
 
     // --- Session List ---
+    let list_width = list_chunk.width.saturating_sub(3) as usize;
     let items: Vec<ListItem> = app
         .filtered_sessions
         .iter()
         .map(|s| {
-            let mut text = s.to_string();
+            let base_text = s.to_string();
             if s.is_active() {
                  let remaining = s.remaining_duration();
                  let mins = remaining.as_secs() / 60;
                  let secs = remaining.as_secs() % 60;
-                 text.push_str(&format!(" [Running: {:02}:{:02}]", mins, secs));
+                 let timer_text = format!("[Running: {:02}:{:02}]", mins, secs);
+                 
+                 let content_len = base_text.chars().count() + timer_text.chars().count();
+                 let padding_len = list_width.saturating_sub(content_len);
+                 let padding = " ".repeat(padding_len);
+                 
+                 ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
+            } else {
+                ListItem::new(base_text)
             }
-            ListItem::new(text)
         })
         .collect();
     let list = List::new(items)

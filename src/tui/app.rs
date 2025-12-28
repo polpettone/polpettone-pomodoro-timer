@@ -14,10 +14,10 @@ use ratatui::{
 };
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
-use crate::session::{serialize_session, Session};
+use crate::session::{serialize_session, Session, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | a: create | e: edit | q: quit | Esc: cancel/back";
+    "j/k: up/down | /: search | i: date filter | t: tags | a: create | e: edit | c: cancel | q: quit | Esc: back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -59,6 +59,19 @@ impl App {
     pub fn new(sessions: Vec<Session>, session_dir: String) -> App {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
+        
+        // Auto-update expired running sessions to Done
+        for session in sessions.iter_mut() {
+            if session.state == SessionState::Running {
+                let remaining = session.remaining_duration();
+                if remaining.as_secs() == 0 {
+                    session.state = SessionState::Done;
+                    // We should save this change.
+                    // Ignoring error here for simplicity in constructor, or log it.
+                    let _ = serialize_session(session, &session_dir, session.start);
+                }
+            }
+        }
 
         let mut list_state = ListState::default();
         if !sessions.is_empty() {
@@ -190,6 +203,24 @@ impl App {
         Ok(())
     }
 
+    fn cancel_session(&mut self) -> Result<(), Box<dyn Error>> {
+         if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
+                if selected_session.state == SessionState::Running {
+                     selected_session.state = SessionState::Canceled;
+                     
+                     // Update in main list
+                     if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
+                         original_session.state = SessionState::Canceled;
+                     }
+                     
+                     serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+                }
+            }
+         }
+         Ok(())
+    }
+
     fn handle_edit_session(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -259,6 +290,7 @@ impl App {
             duration: Duration::from_secs(duration_mins * 60),
             start,
             tags: Vec::new(),
+            state: SessionState::Running,
         };
         
         serialize_session(&session, &self.session_dir, start)?;
@@ -278,6 +310,23 @@ impl App {
         let mut terminal = Terminal::new(backend)?;
 
         loop {
+            // Check for expired running sessions to auto-update UI to "Done"
+            // We check this every loop to keep UI fresh
+            // Only update if something changed to avoid flicker or performance hit?
+            // Actually, calculating remaining time is cheap.
+            // But we should persist the "Done" state if it just transitioned.
+            let mut changed = false;
+            for session in self.sessions.iter_mut() {
+                if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
+                    session.state = SessionState::Done;
+                    let _ = serialize_session(session, &self.session_dir, session.start);
+                    changed = true;
+                }
+            }
+            if changed {
+                self.filter_sessions(); // Refresh filtered list
+            }
+
             terminal.draw(|f| ui(f, self))?;
 
             if event::poll(Duration::from_millis(250))? {
@@ -307,6 +356,7 @@ impl App {
                                 };
                                 self.mode = Mode::Creation(CreationField::Duration);
                             }
+                            KeyCode::Char('c') => self.cancel_session()?,
                             KeyCode::Tab => {
                                 self.mode = Mode::Input(InputField::Search);
                             }
@@ -394,7 +444,7 @@ fn keybinds_bar() -> Paragraph<'static> {
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
-     // Define constraints based on mode
+    // Define constraints based on mode
     let constraints = if let Mode::Creation(_) = app.mode {
         vec![
             Constraint::Length(3), // Top Inputs (Date + Search)
@@ -510,20 +560,28 @@ fn ui(f: &mut Frame, app: &mut App) {
         .iter()
         .map(|s| {
             let base_text = s.to_string();
-            if s.is_active() {
-                 let remaining = s.remaining_duration();
-                 let mins = remaining.as_secs() / 60;
-                 let secs = remaining.as_secs() % 60;
-                 let timer_text = format!("[Running: {:02}:{:02}]", mins, secs);
-                 
-                 let content_len = base_text.chars().count() + timer_text.chars().count();
-                 let padding_len = list_width.saturating_sub(content_len);
-                 let padding = " ".repeat(padding_len);
-                 
-                 ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
-            } else {
-                ListItem::new(base_text)
-            }
+            // Determine Right-aligned status text
+            let status_text = match s.state {
+                SessionState::Running => {
+                     let remaining = s.remaining_duration();
+                     if remaining.as_secs() == 0 {
+                         "[Done]".to_string()
+                     } else {
+                         let mins = remaining.as_secs() / 60;
+                         let secs = remaining.as_secs() % 60;
+                         format!("[Running: {:02}:{:02}]", mins, secs)
+                     }
+                },
+                SessionState::Done => "[Done]".to_string(),
+                SessionState::Canceled => "[Canceled]".to_string(),
+                SessionState::Deleted => "[Deleted]".to_string(),
+            };
+
+            let content_len = base_text.chars().count() + status_text.chars().count();
+            let padding_len = list_width.saturating_sub(content_len);
+            let padding = " ".repeat(padding_len);
+            
+            ListItem::new(format!("{}{}{}", base_text, padding, status_text))
         })
         .collect();
     let list = List::new(items)

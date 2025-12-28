@@ -13,6 +13,18 @@ use crate::date_time::{deserialize_human_readable, duration_in_minutes, serializ
 use std::fs::OpenOptions;
 use std::io;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum SessionState {
+    Running,
+    Done,
+    Deleted,
+    Canceled,
+}
+
+fn default_state() -> SessionState {
+    SessionState::Done
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
     pub description: String,
@@ -24,6 +36,8 @@ pub struct Session {
     pub start: DateTime<Utc>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default = "default_state")]
+    pub state: SessionState,
 }
 
 impl fmt::Display for Session {
@@ -49,8 +63,13 @@ impl Session {
     }
 
     pub fn is_active(&self) -> bool {
-        let now = Utc::now();
-        self.start + self.duration > now
+        // Keeps the time-based check for "is the timer logically running"
+        // But we might prefer to check the state. 
+        // For now, let's say it's active if the State says so AND time is remaining?
+        // Or just trust the state? 
+        // The prompt says "Alle laufenden Sessions haben State Running". 
+        // So checking state is correct.
+        self.state == SessionState::Running
     }
 
     pub fn remaining_duration(&self) -> Duration {
@@ -86,6 +105,7 @@ impl SessionService {
             duration: Duration::new(duration_seconds, 0),
             start: start_date,
             tags: Vec::new(),
+            state: SessionState::Running,
         };
 
         serialize_session(&session, session_dir, start_date)?;

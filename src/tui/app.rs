@@ -16,7 +16,8 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
 use crate::session::{serialize_session, Session};
 
-const KEYBINDS_TEXT: &str = "j/k: up/down | /: search | i: date filter | t: tags | e: edit | q: quit | Esc: cancel/back";
+const KEYBINDS_TEXT: &str =
+    "j/k: up/down | /: search | i: date filter | t: tags | e: edit | q: quit | Esc: cancel/back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -46,7 +47,7 @@ impl App {
     pub fn new(sessions: Vec<Session>, session_dir: String) -> App {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
-        
+
         let mut list_state = ListState::default();
         if !sessions.is_empty() {
             list_state.select(Some(0));
@@ -97,41 +98,46 @@ impl App {
         let search_query = self.search_input.trim();
         let matcher = SkimMatcherV2::default();
 
-        let filtered: Vec<Session> = self.sessions.iter().filter(|s| {
-            // Date Filter
-            let date_match = if date_query.is_empty() {
-                true
-            } else if date_query.contains(" - ") {
-                let parts: Vec<&str> = date_query.split(" - ").collect();
-                if parts.len() == 2 {
-                    if let (Ok(start), Ok(end)) = (
-                        NaiveDate::parse_from_str(parts[0], "%Y-%m-%d"),
-                        NaiveDate::parse_from_str(parts[1], "%Y-%m-%d"),
-                    ) {
-                        let d = s.start.date_naive();
-                        d >= start && d <= end
+        let filtered: Vec<Session> = self
+            .sessions
+            .iter()
+            .filter(|s| {
+                // Date Filter
+                let date_match = if date_query.is_empty() {
+                    true
+                } else if date_query.contains(" - ") {
+                    let parts: Vec<&str> = date_query.split(" - ").collect();
+                    if parts.len() == 2 {
+                        if let (Ok(start), Ok(end)) = (
+                            NaiveDate::parse_from_str(parts[0], "%Y-%m-%d"),
+                            NaiveDate::parse_from_str(parts[1], "%Y-%m-%d"),
+                        ) {
+                            let d = s.start.date_naive();
+                            d >= start && d <= end
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
+                } else if let Ok(date) = NaiveDate::parse_from_str(date_query, "%Y-%m-%d") {
+                    s.start.date_naive() == date
                 } else {
                     false
-                }
-            } else if let Ok(date) = NaiveDate::parse_from_str(date_query, "%Y-%m-%d") {
-                s.start.date_naive() == date
-            } else {
-                false
-            };
+                };
 
-            // Search Filter (Fuzzy)
-            let search_match = if search_query.is_empty() {
-                true
-            } else {
-                let text_to_search = format!("{} {}", s.description, s.tags.join(" "));
-                matcher.fuzzy_match(&text_to_search, search_query).is_some()
-            };
+                // Search Filter (Fuzzy)
+                let search_match = if search_query.is_empty() {
+                    true
+                } else {
+                    let text_to_search = format!("{} {}", s.description, s.tags.join(" "));
+                    matcher.fuzzy_match(&text_to_search, search_query).is_some()
+                };
 
-            date_match && search_match
-        }).cloned().collect();
+                date_match && search_match
+            })
+            .cloned()
+            .collect();
 
         self.filtered_sessions = filtered;
         if !self.filtered_sessions.is_empty() {
@@ -151,11 +157,15 @@ impl App {
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
-                
+
                 selected_session.tags = new_tags.clone();
 
                 // Update in main session list
-                if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
+                if let Some(original_session) = self
+                    .sessions
+                    .iter_mut()
+                    .find(|s| s.start == selected_session.start)
+                {
                     original_session.tags = new_tags;
                 }
 
@@ -166,45 +176,60 @@ impl App {
         Ok(())
     }
 
-    fn handle_edit_session(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Box<dyn Error>> {
+    fn handle_edit_session(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    ) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get(selected_idx).cloned() {
                 // Suspend TUI
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                
+
                 // Prepare editor
                 let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
                 let temp_path = env::temp_dir().join("polpettone_edit.yaml");
                 let yaml_content = serde_yaml::to_string(&selected_session)?;
                 fs::write(&temp_path, &yaml_content)?;
-                
+
                 // Run editor
                 let status = Command::new(editor).arg(&temp_path).status()?;
-                
+
                 // Restore TUI
                 enable_raw_mode()?;
                 execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                 terminal.clear()?;
-                
+
                 if status.success() {
                     let new_content = fs::read_to_string(&temp_path)?;
                     if let Ok(edited_session) = serde_yaml::from_str::<Session>(&new_content) {
-                         if edited_session.start != selected_session.start {
-                              let old_filename = format!("{}-session.yaml", selected_session.start.format("%Y%m%d%H%M%S"));
-                              let old_path = std::path::Path::new(&self.session_dir).join(old_filename);
-                              if old_path.exists() {
-                                  let _ = fs::remove_file(old_path);
-                              }
-                         }
+                        if edited_session.start != selected_session.start {
+                            let old_filename = format!(
+                                "{}-session.yaml",
+                                selected_session.start.format("%Y%m%d%H%M%S")
+                            );
+                            let old_path =
+                                std::path::Path::new(&self.session_dir).join(old_filename);
+                            if old_path.exists() {
+                                let _ = fs::remove_file(old_path);
+                            }
+                        }
 
-                        if let Some(idx) = self.sessions.iter().position(|s| s.start == selected_session.start) {
-                             self.sessions[idx] = edited_session.clone();
+                        if let Some(idx) = self
+                            .sessions
+                            .iter()
+                            .position(|s| s.start == selected_session.start)
+                        {
+                            self.sessions[idx] = edited_session.clone();
                         }
                         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
-                        
-                        serialize_session(&edited_session, &self.session_dir, edited_session.start)?;
-                        
+
+                        serialize_session(
+                            &edited_session,
+                            &self.session_dir,
+                            edited_session.start,
+                        )?;
+
                         self.filter_sessions();
                     }
                 }
@@ -229,27 +254,26 @@ impl App {
                 if let Event::Key(key) = event::read()? {
                     match &self.mode {
                         Mode::Navigation => match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Char('i') => self.mode = Mode::Input(InputField::Date),
-                        KeyCode::Char('/') => self.mode = Mode::Input(InputField::Search),
-                        KeyCode::Char('j') => self.next(),
-                        KeyCode::Char('k') => self.previous(),
-                        KeyCode::Char('t') => {
-                            if let Some(idx) = self.list_state.selected() {
-                                if let Some(session) = self.filtered_sessions.get(idx) {
-                                    self.tags_input = session.tags.join(", ");
-                                    self.mode = Mode::Tagging;
+                            KeyCode::Char('q') => break,
+                            KeyCode::Char('i') => self.mode = Mode::Input(InputField::Date),
+                            KeyCode::Char('/') => self.mode = Mode::Input(InputField::Search),
+                            KeyCode::Char('j') => self.next(),
+                            KeyCode::Char('k') => self.previous(),
+                            KeyCode::Char('t') => {
+                                if let Some(idx) = self.list_state.selected() {
+                                    if let Some(session) = self.filtered_sessions.get(idx) {
+                                        self.tags_input = session.tags.join(", ");
+                                        self.mode = Mode::Tagging;
+                                    }
                                 }
                             }
-                        }
-                        KeyCode::Char('e') => self.handle_edit_session(&mut terminal)?,
-                        KeyCode::Tab => {
-                             self.mode = Mode::Input(InputField::Search);
-                        }
-                        _ => {}
-                    },
-                    Mode::Input(field) => {
-                        match key.code {
+                            KeyCode::Char('e') => self.handle_edit_session(&mut terminal)?,
+                            KeyCode::Tab => {
+                                self.mode = Mode::Input(InputField::Search);
+                            }
+                            _ => {}
+                        },
+                        Mode::Input(field) => match key.code {
                             KeyCode::Char(c) => {
                                 match field {
                                     InputField::Date => self.date_input.push(c),
@@ -259,8 +283,12 @@ impl App {
                             }
                             KeyCode::Backspace => {
                                 match field {
-                                    InputField::Date => { self.date_input.pop(); },
-                                    InputField::Search => { self.search_input.pop(); },
+                                    InputField::Date => {
+                                        self.date_input.pop();
+                                    }
+                                    InputField::Search => {
+                                        self.search_input.pop();
+                                    }
                                 }
                                 self.filter_sessions();
                             }
@@ -272,24 +300,23 @@ impl App {
                                 }
                             }
                             _ => {}
-                        }
-                    },
-                    Mode::Tagging => match key.code {
-                        KeyCode::Char(c) => self.tags_input.push(c),
-                        KeyCode::Backspace => {
-                            self.tags_input.pop();
-                        }
-                        KeyCode::Enter => {
-                            self.save_tags()?;
-                            self.mode = Mode::Navigation;
-                        }
-                        KeyCode::Esc => self.mode = Mode::Navigation,
-                        _ => {}
+                        },
+                        Mode::Tagging => match key.code {
+                            KeyCode::Char(c) => self.tags_input.push(c),
+                            KeyCode::Backspace => {
+                                self.tags_input.pop();
+                            }
+                            KeyCode::Enter => {
+                                self.save_tags()?;
+                                self.mode = Mode::Navigation;
+                            }
+                            KeyCode::Esc => self.mode = Mode::Navigation,
+                            _ => {}
+                        },
                     }
                 }
             }
         }
-    }
 
         // restore terminal
         disable_raw_mode()?;
@@ -339,7 +366,7 @@ fn ui(f: &mut Frame, app: &mut App) {
             .as_ref(),
         )
         .split(top_chunk);
-    
+
     let date_chunk = top_chunks[0];
     let search_chunk = top_chunks[1];
 
@@ -363,40 +390,33 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(search_title));
     f.render_widget(search_input, search_chunk);
 
-
     // --- Split Main Content (List + Tags) ---
     let content_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(70),
-                Constraint::Percentage(30),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(main_content_chunk);
-    
+
     let list_chunk = content_chunks[0];
     let tags_chunk = content_chunks[1];
 
     // --- Session List ---
-    let list_width = list_chunk.width.saturating_sub(3) as usize;
+    let list_width = list_chunk.width.saturating_sub(5) as usize;
     let items: Vec<ListItem> = app
         .filtered_sessions
         .iter()
         .map(|s| {
             let base_text = s.to_string();
             if s.is_active() {
-                 let remaining = s.remaining_duration();
-                 let mins = remaining.as_secs() / 60;
-                 let secs = remaining.as_secs() % 60;
-                 let timer_text = format!("[Running: {:02}:{:02}]", mins, secs);
-                 
-                 let content_len = base_text.chars().count() + timer_text.chars().count();
-                 let padding_len = list_width.saturating_sub(content_len);
-                 let padding = " ".repeat(padding_len);
-                 
-                 ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
+                let remaining = s.remaining_duration();
+                let mins = remaining.as_secs() / 60;
+                let secs = remaining.as_secs() % 60;
+                let timer_text = format!("Running: {:02}:{:02}", mins, secs);
+
+                let content_len = base_text.chars().count() + timer_text.chars().count();
+                let padding_len = list_width.saturating_sub(content_len);
+                let padding = " ".repeat(padding_len);
+
+                ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
             } else {
                 ListItem::new(base_text)
             }
@@ -406,9 +426,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().title("Sessions").borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
-    
+
     f.render_stateful_widget(list, list_chunk, &mut app.list_state);
-    
+
     // --- Tags Pane ---
     let tags_title = if app.mode == Mode::Tagging {
         "Tags (Active)"
@@ -419,7 +439,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_text = if app.mode == Mode::Tagging {
         app.tags_input.clone()
     } else {
-            if let Some(idx) = app.list_state.selected() {
+        if let Some(idx) = app.list_state.selected() {
             if let Some(session) = app.filtered_sessions.get(idx) {
                 session.tags.join(", ")
             } else {
@@ -433,9 +453,9 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_widget = Paragraph::new(tags_text)
         .block(Block::default().borders(Borders::ALL).title(tags_title))
         .wrap(ratatui::widgets::Wrap { trim: true });
-    
+
     f.render_widget(tags_widget, tags_chunk);
-    
+
     // --- Keybinds ---
     f.render_widget(keybinds_bar(), keybinds_chunk);
 
@@ -448,13 +468,13 @@ fn ui(f: &mut Frame, app: &mut App) {
             ));
         }
         Mode::Input(InputField::Search) => {
-             f.set_cursor_position((
+            f.set_cursor_position((
                 search_chunk.x + app.search_input.len() as u16 + 1,
                 search_chunk.y + 1,
             ));
         }
         Mode::Tagging => {
-             f.set_cursor_position((
+            f.set_cursor_position((
                 tags_chunk.x + app.tags_input.len() as u16 + 1,
                 tags_chunk.y + 1,
             ));

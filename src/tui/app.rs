@@ -42,6 +42,9 @@ pub struct App {
 
 impl App {
     pub fn new(sessions: Vec<Session>, session_dir: String) -> App {
+        let mut sessions = sessions;
+        sessions.sort_by(|a, b| b.start.cmp(&a.start));
+
         let mut list_state = ListState::default();
         if !sessions.is_empty() {
             list_state.select(Some(0));
@@ -197,6 +200,7 @@ impl App {
                              self.sessions[idx] = edited_session.clone();
                         }
                         
+                        self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
                         serialize_session(&edited_session, &self.session_dir, edited_session.start)?;
                         
                         self.filter_sessions();

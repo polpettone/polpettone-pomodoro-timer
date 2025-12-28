@@ -394,24 +394,37 @@ fn keybinds_bar() -> Paragraph<'static> {
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
+     // Define constraints based on mode
+    let constraints = if let Mode::Creation(_) = app.mode {
+        vec![
+            Constraint::Length(3), // Top Inputs (Date + Search)
+            Constraint::Length(3), // Creation Inputs (Duration + Description)
+            Constraint::Min(0),    // Main content
+            Constraint::Length(3), // Keybinds
+        ]
+    } else {
+        vec![
+            Constraint::Length(3), // Top Inputs (Date + Search)
+            Constraint::Min(0),    // Main content
+            Constraint::Length(3), // Keybinds
+        ]
+    };
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints(
-            [
-                Constraint::Length(3), // Top Inputs (Date + Search OR Duration + Description)
-                Constraint::Min(0),    // Main content
-                Constraint::Length(3), // Keybinds
-            ]
-            .as_ref(),
-        )
+        .constraints(constraints)
         .split(f.area());
 
+    // Map chunks
     let top_chunk = chunks[0];
-    let main_content_chunk = chunks[1];
-    let keybinds_chunk = chunks[2];
+    let (creation_chunk, main_content_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
+        (Some(chunks[1]), chunks[2], chunks[3])
+    } else {
+        (None, chunks[1], chunks[2])
+    };
 
-    // --- Top Inputs Split ---
+    // --- Top Inputs Split (Date/Search) ---
     let top_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -423,43 +436,54 @@ fn ui(f: &mut Frame, app: &mut App) {
         )
         .split(top_chunk);
     
-    // --- Render Top Inputs based on Mode ---
-    match &app.mode {
-        Mode::Creation(field) => {
+    let date_chunk = top_chunks[0];
+    let search_chunk = top_chunks[1];
+
+    // --- Date Input ---
+    let date_title = if let Mode::Input(InputField::Date) = app.mode {
+        "Date (Active)"
+    } else {
+        "Date"
+    };
+    let date_input = Paragraph::new(app.date_input.as_str())
+        .block(Block::default().borders(Borders::ALL).title(date_title));
+    f.render_widget(date_input, date_chunk);
+
+    // --- Search Input ---
+    let search_title = if let Mode::Input(InputField::Search) = app.mode {
+        "Search (Active)"
+    } else {
+        "Search (/)"
+    };
+    let search_input = Paragraph::new(app.search_input.as_str())
+        .block(Block::default().borders(Borders::ALL).title(search_title));
+    f.render_widget(search_input, search_chunk);
+
+
+    // --- Creation Inputs (If Active) ---
+    if let Some(c_chunk) = creation_chunk {
+        if let Mode::Creation(ref field) = app.mode {
+             let creation_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Percentage(50), 
+                        Constraint::Percentage(50), 
+                    ]
+                    .as_ref(),
+                )
+                .split(c_chunk);
+
              let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
              let desc_title = if let CreationField::Description = field { "Description (Active)" } else { "Description" };
              
              let duration_input = Paragraph::new(app.creation_duration.as_str())
                 .block(Block::default().borders(Borders::ALL).title(duration_title));
-             f.render_widget(duration_input, top_chunks[0]);
+             f.render_widget(duration_input, creation_chunks[0]);
              
              let desc_input = Paragraph::new(app.creation_description.as_str())
                 .block(Block::default().borders(Borders::ALL).title(desc_title));
-             f.render_widget(desc_input, top_chunks[1]);
-        },
-        _ => {
-            let date_chunk = top_chunks[0];
-            let search_chunk = top_chunks[1];
-
-            // --- Date Input ---
-            let date_title = if let Mode::Input(InputField::Date) = app.mode {
-                "Date (Active)"
-            } else {
-                "Date"
-            };
-            let date_input = Paragraph::new(app.date_input.as_str())
-                .block(Block::default().borders(Borders::ALL).title(date_title));
-            f.render_widget(date_input, date_chunk);
-
-            // --- Search Input ---
-            let search_title = if let Mode::Input(InputField::Search) = app.mode {
-                "Search (Active)"
-            } else {
-                "Search (/)"
-            };
-            let search_input = Paragraph::new(app.search_input.as_str())
-                .block(Block::default().borders(Borders::ALL).title(search_title));
-            f.render_widget(search_input, search_chunk);
+             f.render_widget(desc_input, creation_chunks[1]);
         }
     }
 
@@ -543,14 +567,14 @@ fn ui(f: &mut Frame, app: &mut App) {
     match app.mode {
         Mode::Input(InputField::Date) => {
             f.set_cursor_position((
-                top_chunks[0].x + app.date_input.len() as u16 + 1,
-                top_chunks[0].y + 1,
+                date_chunk.x + app.date_input.len() as u16 + 1,
+                date_chunk.y + 1,
             ));
         }
         Mode::Input(InputField::Search) => {
              f.set_cursor_position((
-                top_chunks[1].x + app.search_input.len() as u16 + 1,
-                top_chunks[1].y + 1,
+                search_chunk.x + app.search_input.len() as u16 + 1,
+                search_chunk.y + 1,
             ));
         }
         Mode::Tagging => {
@@ -560,16 +584,28 @@ fn ui(f: &mut Frame, app: &mut App) {
             ));
         }
         Mode::Creation(CreationField::Duration) => {
-            f.set_cursor_position((
-                top_chunks[0].x + app.creation_duration.len() as u16 + 1,
-                top_chunks[0].y + 1,
-            ));
+            if let Some(c_chunk) = creation_chunk {
+                 let creation_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                    .split(c_chunk);
+                 f.set_cursor_position((
+                    creation_chunks[0].x + app.creation_duration.len() as u16 + 1,
+                    creation_chunks[0].y + 1,
+                ));
+            }
         }
         Mode::Creation(CreationField::Description) => {
-            f.set_cursor_position((
-                top_chunks[1].x + app.creation_description.len() as u16 + 1,
-                top_chunks[1].y + 1,
-            ));
+            if let Some(c_chunk) = creation_chunk {
+                 let creation_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                    .split(c_chunk);
+                f.set_cursor_position((
+                    creation_chunks[1].x + app.creation_description.len() as u16 + 1,
+                    creation_chunks[1].y + 1,
+                ));
+            }
         }
         _ => {}
     }

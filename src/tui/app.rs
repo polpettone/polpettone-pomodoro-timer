@@ -8,13 +8,15 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use std::{env, error::Error, fs, io, process::Command};
 
 use crate::session::{serialize_session, Session};
+
+const KEYBINDS_TEXT: &str = "j/k: up/down | /: search | i: date filter | t: tags | e: edit | q: quit | Esc: cancel/back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -44,7 +46,7 @@ impl App {
     pub fn new(sessions: Vec<Session>, session_dir: String) -> App {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
-
+        
         let mut list_state = ListState::default();
         if !sessions.is_empty() {
             list_state.select(Some(0));
@@ -199,8 +201,8 @@ impl App {
                         if let Some(idx) = self.sessions.iter().position(|s| s.start == selected_session.start) {
                              self.sessions[idx] = edited_session.clone();
                         }
-                        
                         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
+                        
                         serialize_session(&edited_session, &self.session_dir, edited_session.start)?;
                         
                         self.filter_sessions();
@@ -300,6 +302,12 @@ impl App {
     }
 }
 
+fn keybinds_bar() -> Paragraph<'static> {
+    Paragraph::new(KEYBINDS_TEXT)
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().borders(Borders::ALL).title("Keybinds"))
+}
+
 fn ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -308,6 +316,7 @@ fn ui(f: &mut Frame, app: &mut App) {
             [
                 Constraint::Length(3), // Top Inputs (Date + Search)
                 Constraint::Min(0),    // Main content
+                Constraint::Length(3), // Keybinds
             ]
             .as_ref(),
         )
@@ -315,6 +324,7 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     let top_chunk = chunks[0];
     let main_content_chunk = chunks[1];
+    let keybinds_chunk = chunks[2];
 
     // --- Top Inputs Split ---
     let top_chunks = Layout::default()
@@ -406,6 +416,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         .wrap(ratatui::widgets::Wrap { trim: true });
     
     f.render_widget(tags_widget, tags_chunk);
+    
+    // --- Keybinds ---
+    f.render_widget(keybinds_bar(), keybinds_chunk);
 
     // --- Cursor ---
     match app.mode {

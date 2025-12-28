@@ -47,6 +47,21 @@ impl Session {
             duration_since_start.num_nanoseconds().unwrap_or(0) as u32,
         )
     }
+
+    pub fn is_active(&self) -> bool {
+        let now = Utc::now();
+        self.start + self.duration > now
+    }
+
+    pub fn remaining_duration(&self) -> Duration {
+        let now = Utc::now();
+        let end = self.start + self.duration;
+        if end > now {
+            (end - now).to_std().unwrap_or(Duration::from_secs(0))
+        } else {
+            Duration::from_secs(0)
+        }
+    }
 }
 
 pub struct SessionService {

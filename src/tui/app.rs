@@ -12,7 +12,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use std::{env, error::Error, fs, io, process::Command};
+use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
 use crate::session::{serialize_session, Session};
 
@@ -225,9 +225,10 @@ impl App {
         loop {
             terminal.draw(|f| ui(f, self))?;
 
-            if let Event::Key(key) = event::read()? {
-                match &self.mode {
-                    Mode::Navigation => match key.code {
+            if event::poll(Duration::from_millis(250))? {
+                if let Event::Key(key) = event::read()? {
+                    match &self.mode {
+                        Mode::Navigation => match key.code {
                         KeyCode::Char('q') => break,
                         KeyCode::Char('i') => self.mode = Mode::Input(InputField::Date),
                         KeyCode::Char('/') => self.mode = Mode::Input(InputField::Search),
@@ -288,6 +289,7 @@ impl App {
                 }
             }
         }
+    }
 
         // restore terminal
         disable_raw_mode()?;
@@ -381,7 +383,16 @@ fn ui(f: &mut Frame, app: &mut App) {
     let items: Vec<ListItem> = app
         .filtered_sessions
         .iter()
-        .map(|s| ListItem::new(s.to_string()))
+        .map(|s| {
+            let mut text = s.to_string();
+            if s.is_active() {
+                 let remaining = s.remaining_duration();
+                 let mins = remaining.as_secs() / 60;
+                 let secs = remaining.as_secs() % 60;
+                 text.push_str(&format!(" [Running: {:02}:{:02}]", mins, secs));
+            }
+            ListItem::new(text)
+        })
         .collect();
     let list = List::new(items)
         .block(Block::default().title("Sessions").borders(Borders::ALL))

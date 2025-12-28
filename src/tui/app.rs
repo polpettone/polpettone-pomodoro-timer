@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -17,7 +17,7 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 use crate::session::{serialize_session, Session};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | e: edit | q: quit | Esc: cancel/back";
+    "j/k: up/down | /: search | i: date filter | t: tags | a: create | e: edit | q: quit | Esc: cancel/back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -26,10 +26,17 @@ pub enum InputField {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CreationField {
+    Duration,
+    Description,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Mode {
     Input(InputField),
     Navigation,
     Tagging,
+    Creation(CreationField),
 }
 
 pub struct App {
@@ -38,6 +45,11 @@ pub struct App {
     pub date_input: String,
     pub search_input: String,
     pub tags_input: String,
+    
+    // Creation fields
+    pub creation_duration: String,
+    pub creation_description: String,
+
     pub mode: Mode,
     pub list_state: ListState,
     pub session_dir: String,
@@ -59,6 +71,8 @@ impl App {
             date_input: String::new(),
             search_input: String::new(),
             tags_input: String::new(),
+            creation_duration: String::new(),
+            creation_description: String::new(),
             mode: Mode::Navigation,
             list_state,
             session_dir,
@@ -182,20 +196,16 @@ impl App {
     ) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get(selected_idx).cloned() {
-                // Suspend TUI
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
 
-                // Prepare editor
                 let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
                 let temp_path = env::temp_dir().join("polpettone_edit.yaml");
                 let yaml_content = serde_yaml::to_string(&selected_session)?;
                 fs::write(&temp_path, &yaml_content)?;
 
-                // Run editor
                 let status = Command::new(editor).arg(&temp_path).status()?;
 
-                // Restore TUI
                 enable_raw_mode()?;
                 execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                 terminal.clear()?;
@@ -239,8 +249,28 @@ impl App {
         Ok(())
     }
 
+    fn create_session(&mut self) -> Result<(), Box<dyn Error>> {
+        let duration_mins: u64 = self.creation_duration.trim().parse().unwrap_or(25);
+        let description = self.creation_description.trim().to_string();
+        
+        let start = Utc::now();
+        let session = Session {
+            description,
+            duration: Duration::from_secs(duration_mins * 60),
+            start,
+            tags: Vec::new(),
+        };
+        
+        serialize_session(&session, &self.session_dir, start)?;
+        
+        self.sessions.push(session);
+        self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
+        
+        self.filter_sessions();
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        // setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -268,6 +298,15 @@ impl App {
                                 }
                             }
                             KeyCode::Char('e') => self.handle_edit_session(&mut terminal)?,
+                            KeyCode::Char('a') => {
+                                self.creation_duration = "25".to_string();
+                                self.creation_description = if let Some(first) = self.sessions.first() {
+                                    first.description.clone()
+                                } else {
+                                    String::new()
+                                };
+                                self.mode = Mode::Creation(CreationField::Duration);
+                            }
                             KeyCode::Tab => {
                                 self.mode = Mode::Input(InputField::Search);
                             }
@@ -283,12 +322,8 @@ impl App {
                             }
                             KeyCode::Backspace => {
                                 match field {
-                                    InputField::Date => {
-                                        self.date_input.pop();
-                                    }
-                                    InputField::Search => {
-                                        self.search_input.pop();
-                                    }
+                                    InputField::Date => { self.date_input.pop(); }
+                                    InputField::Search => { self.search_input.pop(); }
                                 }
                                 self.filter_sessions();
                             }
@@ -313,12 +348,33 @@ impl App {
                             KeyCode::Esc => self.mode = Mode::Navigation,
                             _ => {}
                         },
+                        Mode::Creation(field) => match key.code {
+                             KeyCode::Char(c) => match field {
+                                CreationField::Duration => self.creation_duration.push(c),
+                                CreationField::Description => self.creation_description.push(c),
+                            },
+                            KeyCode::Backspace => match field {
+                                CreationField::Duration => { self.creation_duration.pop(); }
+                                CreationField::Description => { self.creation_description.pop(); }
+                            },
+                            KeyCode::Tab => {
+                                self.mode = match field {
+                                    CreationField::Duration => Mode::Creation(CreationField::Description),
+                                    CreationField::Description => Mode::Creation(CreationField::Duration),
+                                }
+                            },
+                            KeyCode::Enter => {
+                                self.create_session()?;
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Esc => self.mode = Mode::Navigation,
+                            _ => {}
+                        }
                     }
                 }
             }
         }
 
-        // restore terminal
         disable_raw_mode()?;
         execute!(
             terminal.backend_mut(),
@@ -343,7 +399,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .margin(1)
         .constraints(
             [
-                Constraint::Length(3), // Top Inputs (Date + Search)
+                Constraint::Length(3), // Top Inputs (Date + Search OR Duration + Description)
                 Constraint::Min(0),    // Main content
                 Constraint::Length(3), // Keybinds
             ]
@@ -360,42 +416,66 @@ fn ui(f: &mut Frame, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(50), // Date
-                Constraint::Percentage(50), // Search
+                Constraint::Percentage(50), 
+                Constraint::Percentage(50), 
             ]
             .as_ref(),
         )
         .split(top_chunk);
+    
+    // --- Render Top Inputs based on Mode ---
+    match &app.mode {
+        Mode::Creation(field) => {
+             let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
+             let desc_title = if let CreationField::Description = field { "Description (Active)" } else { "Description" };
+             
+             let duration_input = Paragraph::new(app.creation_duration.as_str())
+                .block(Block::default().borders(Borders::ALL).title(duration_title));
+             f.render_widget(duration_input, top_chunks[0]);
+             
+             let desc_input = Paragraph::new(app.creation_description.as_str())
+                .block(Block::default().borders(Borders::ALL).title(desc_title));
+             f.render_widget(desc_input, top_chunks[1]);
+        },
+        _ => {
+            let date_chunk = top_chunks[0];
+            let search_chunk = top_chunks[1];
 
-    let date_chunk = top_chunks[0];
-    let search_chunk = top_chunks[1];
+            // --- Date Input ---
+            let date_title = if let Mode::Input(InputField::Date) = app.mode {
+                "Date (Active)"
+            } else {
+                "Date"
+            };
+            let date_input = Paragraph::new(app.date_input.as_str())
+                .block(Block::default().borders(Borders::ALL).title(date_title));
+            f.render_widget(date_input, date_chunk);
 
-    // --- Date Input ---
-    let date_title = if let Mode::Input(InputField::Date) = app.mode {
-        "Date (Active)"
-    } else {
-        "Date"
-    };
-    let date_input = Paragraph::new(app.date_input.as_str())
-        .block(Block::default().borders(Borders::ALL).title(date_title));
-    f.render_widget(date_input, date_chunk);
+            // --- Search Input ---
+            let search_title = if let Mode::Input(InputField::Search) = app.mode {
+                "Search (Active)"
+            } else {
+                "Search (/)"
+            };
+            let search_input = Paragraph::new(app.search_input.as_str())
+                .block(Block::default().borders(Borders::ALL).title(search_title));
+            f.render_widget(search_input, search_chunk);
+        }
+    }
 
-    // --- Search Input ---
-    let search_title = if let Mode::Input(InputField::Search) = app.mode {
-        "Search (Active)"
-    } else {
-        "Search (/)"
-    };
-    let search_input = Paragraph::new(app.search_input.as_str())
-        .block(Block::default().borders(Borders::ALL).title(search_title));
-    f.render_widget(search_input, search_chunk);
 
     // --- Split Main Content (List + Tags) ---
     let content_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+        .constraints(
+            [
+                Constraint::Percentage(70),
+                Constraint::Percentage(30),
+            ]
+            .as_ref(),
+        )
         .split(main_content_chunk);
-
+    
     let list_chunk = content_chunks[0];
     let tags_chunk = content_chunks[1];
 
@@ -407,16 +487,16 @@ fn ui(f: &mut Frame, app: &mut App) {
         .map(|s| {
             let base_text = s.to_string();
             if s.is_active() {
-                let remaining = s.remaining_duration();
-                let mins = remaining.as_secs() / 60;
-                let secs = remaining.as_secs() % 60;
-                let timer_text = format!("Running: {:02}:{:02}", mins, secs);
-
-                let content_len = base_text.chars().count() + timer_text.chars().count();
-                let padding_len = list_width.saturating_sub(content_len);
-                let padding = " ".repeat(padding_len);
-
-                ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
+                 let remaining = s.remaining_duration();
+                 let mins = remaining.as_secs() / 60;
+                 let secs = remaining.as_secs() % 60;
+                 let timer_text = format!("[Running: {:02}:{:02}]", mins, secs);
+                 
+                 let content_len = base_text.chars().count() + timer_text.chars().count();
+                 let padding_len = list_width.saturating_sub(content_len);
+                 let padding = " ".repeat(padding_len);
+                 
+                 ListItem::new(format!("{}{}{}", base_text, padding, timer_text))
             } else {
                 ListItem::new(base_text)
             }
@@ -426,9 +506,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().title("Sessions").borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
-
+    
     f.render_stateful_widget(list, list_chunk, &mut app.list_state);
-
+    
     // --- Tags Pane ---
     let tags_title = if app.mode == Mode::Tagging {
         "Tags (Active)"
@@ -439,7 +519,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_text = if app.mode == Mode::Tagging {
         app.tags_input.clone()
     } else {
-        if let Some(idx) = app.list_state.selected() {
+            if let Some(idx) = app.list_state.selected() {
             if let Some(session) = app.filtered_sessions.get(idx) {
                 session.tags.join(", ")
             } else {
@@ -453,9 +533,9 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_widget = Paragraph::new(tags_text)
         .block(Block::default().borders(Borders::ALL).title(tags_title))
         .wrap(ratatui::widgets::Wrap { trim: true });
-
+    
     f.render_widget(tags_widget, tags_chunk);
-
+    
     // --- Keybinds ---
     f.render_widget(keybinds_bar(), keybinds_chunk);
 
@@ -463,20 +543,32 @@ fn ui(f: &mut Frame, app: &mut App) {
     match app.mode {
         Mode::Input(InputField::Date) => {
             f.set_cursor_position((
-                date_chunk.x + app.date_input.len() as u16 + 1,
-                date_chunk.y + 1,
+                top_chunks[0].x + app.date_input.len() as u16 + 1,
+                top_chunks[0].y + 1,
             ));
         }
         Mode::Input(InputField::Search) => {
-            f.set_cursor_position((
-                search_chunk.x + app.search_input.len() as u16 + 1,
-                search_chunk.y + 1,
+             f.set_cursor_position((
+                top_chunks[1].x + app.search_input.len() as u16 + 1,
+                top_chunks[1].y + 1,
             ));
         }
         Mode::Tagging => {
-            f.set_cursor_position((
+             f.set_cursor_position((
                 tags_chunk.x + app.tags_input.len() as u16 + 1,
                 tags_chunk.y + 1,
+            ));
+        }
+        Mode::Creation(CreationField::Duration) => {
+            f.set_cursor_position((
+                top_chunks[0].x + app.creation_duration.len() as u16 + 1,
+                top_chunks[0].y + 1,
+            ));
+        }
+        Mode::Creation(CreationField::Description) => {
+            f.set_cursor_position((
+                top_chunks[1].x + app.creation_description.len() as u16 + 1,
+                top_chunks[1].y + 1,
             ));
         }
         _ => {}

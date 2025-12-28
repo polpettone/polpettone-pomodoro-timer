@@ -11,7 +11,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use std::{error::Error, io};
+use std::{env, error::Error, fs, io, process::Command};
 
 use crate::session::{serialize_session, Session};
 
@@ -155,6 +155,58 @@ impl App {
         Ok(())
     }
 
+    fn handle_edit_session(&mut self, terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Box<dyn Error>> {
+        if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get(selected_idx).cloned() {
+                // Suspend TUI
+                disable_raw_mode()?;
+                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                
+                // Prepare editor
+                let editor = env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
+                let temp_path = env::temp_dir().join("polpettone_edit.yaml");
+                let yaml_content = serde_yaml::to_string(&selected_session)?;
+                fs::write(&temp_path, &yaml_content)?;
+                
+                // Run editor
+                let status = Command::new(editor).arg(&temp_path).status()?;
+                
+                // Restore TUI
+                enable_raw_mode()?;
+                execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                terminal.clear()?;
+                
+                if status.success() {
+                    let new_content = fs::read_to_string(&temp_path)?;
+                    if let Ok(edited_session) = serde_yaml::from_str::<Session>(&new_content) {
+                         // Check if start time changed, if so we might want to delete the old file
+                         if edited_session.start != selected_session.start {
+                             // Construct old filename
+                              let old_filename = format!("{}-session.yaml", selected_session.start.format("%Y%m%d%H%M%S"));
+                              let old_path = std::path::Path::new(&self.session_dir).join(old_filename);
+                              if old_path.exists() {
+                                  let _ = fs::remove_file(old_path);
+                              }
+                         }
+
+                        // Update in sessions list
+                        if let Some(idx) = self.sessions.iter().position(|s| s.start == selected_session.start) {
+                             self.sessions[idx] = edited_session.clone();
+                        }
+                        
+                        // Save new session
+                        serialize_session(&edited_session, &self.session_dir, edited_session.start)?;
+                        
+                        // Update filtered sessions
+                        self.filter_sessions();
+                    }
+                }
+                let _ = fs::remove_file(&temp_path);
+            }
+        }
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
         // setup terminal
         enable_raw_mode()?;
@@ -181,6 +233,7 @@ impl App {
                                 }
                             }
                         }
+                        KeyCode::Char('e') => self.handle_edit_session(&mut terminal)?,
                         _ => {}
                     },
                     Mode::Input(InputField::Date) => match key.code {

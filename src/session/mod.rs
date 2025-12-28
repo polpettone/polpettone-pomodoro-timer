@@ -21,6 +21,13 @@ pub enum SessionState {
     Canceled,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct SessionRatings {
+    pub mental_energy: u8,
+    pub physical_energy: u8,
+    pub cognitive_load: u8,
+}
+
 fn default_state() -> SessionState {
     SessionState::Done
 }
@@ -40,14 +47,16 @@ pub struct Session {
     pub notes: String,
     #[serde(default = "default_state")]
     pub state: SessionState,
+    #[serde(default)]
+    pub ratings: Option<SessionRatings>,
 }
 
 impl fmt::Display for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} {} min | {}",
-            self.start.format("%Y-%m-%d %H:%M:%S"),
+            "{} - {} minutes - {}",
+            self.start.format("%Y-%m-%d"),
             self.duration.as_secs() / 60,
             self.description
         )
@@ -65,12 +74,6 @@ impl Session {
     }
 
     pub fn is_active(&self) -> bool {
-        // Keeps the time-based check for "is the timer logically running"
-        // But we might prefer to check the state. 
-        // For now, let's say it's active if the State says so AND time is remaining?
-        // Or just trust the state? 
-        // The prompt says "Alle laufenden Sessions haben State Running". 
-        // So checking state is correct.
         self.state == SessionState::Running
     }
 
@@ -109,6 +112,7 @@ impl SessionService {
             tags: Vec::new(),
             notes: String::new(),
             state: SessionState::Running,
+            ratings: None,
         };
 
         serialize_session(&session, session_dir, start_date)?;

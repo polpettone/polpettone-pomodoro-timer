@@ -14,10 +14,10 @@ use ratatui::{
 };
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
-use crate::session::{serialize_session, Session, SessionState};
+use crate::session::{serialize_session, Session, SessionRatings, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | a: create | e: edit | c: cancel | x: delete | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | q: quit | Esc: back";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -32,6 +32,13 @@ pub enum CreationField {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RatingField {
+    MentalEnergy,
+    PhysicalEnergy,
+    CognitiveLoad,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Mode {
     Input(InputField),
     Navigation,
@@ -39,6 +46,7 @@ pub enum Mode {
     Creation(CreationField),
     Notes,
     DeleteConfirm,
+    Rating(RatingField),
 }
 
 pub struct App {
@@ -52,6 +60,11 @@ pub struct App {
     // Creation fields
     pub creation_duration: String,
     pub creation_description: String,
+
+    // Rating fields (temp storage for editing)
+    pub rating_mental: u8,
+    pub rating_physical: u8,
+    pub rating_cognitive: u8,
 
     pub mode: Mode,
     pub list_state: ListState,
@@ -88,6 +101,9 @@ impl App {
             notes_input: String::new(),
             creation_duration: String::new(),
             creation_description: String::new(),
+            rating_mental: 0,
+            rating_physical: 0,
+            rating_cognitive: 0,
             mode: Mode::Navigation,
             list_state,
             session_dir,
@@ -224,6 +240,30 @@ impl App {
         Ok(())
     }
 
+    fn save_ratings(&mut self) -> Result<(), Box<dyn Error>> {
+        if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
+                let ratings = SessionRatings {
+                    mental_energy: self.rating_mental,
+                    physical_energy: self.rating_physical,
+                    cognitive_load: self.rating_cognitive,
+                };
+                selected_session.ratings = Some(ratings.clone());
+
+                if let Some(original_session) = self
+                    .sessions
+                    .iter_mut()
+                    .find(|s| s.start == selected_session.start)
+                {
+                    original_session.ratings = Some(ratings);
+                }
+
+                serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+            }
+        }
+        Ok(())
+    }
+
     fn cancel_session(&mut self) -> Result<(), Box<dyn Error>> {
          if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
@@ -331,6 +371,7 @@ impl App {
             tags: Vec::new(),
             notes: String::new(),
             state: SessionState::Running,
+            ratings: None,
         };
         
         serialize_session(&session, &self.session_dir, start)?;
@@ -386,6 +427,22 @@ impl App {
                                     if let Some(session) = self.filtered_sessions.get(idx) {
                                         self.notes_input = session.notes.clone();
                                         self.mode = Mode::Notes;
+                                    }
+                                }
+                            },
+                            KeyCode::Char('r') => {
+                                if let Some(idx) = self.list_state.selected() {
+                                    if let Some(session) = self.filtered_sessions.get(idx) {
+                                        if let Some(ratings) = &session.ratings {
+                                            self.rating_mental = ratings.mental_energy;
+                                            self.rating_physical = ratings.physical_energy;
+                                            self.rating_cognitive = ratings.cognitive_load;
+                                        } else {
+                                            self.rating_mental = 0;
+                                            self.rating_physical = 0;
+                                            self.rating_cognitive = 0;
+                                        }
+                                        self.mode = Mode::Rating(RatingField::MentalEnergy);
                                     }
                                 }
                             }
@@ -489,6 +546,42 @@ impl App {
                                 self.mode = Mode::Navigation;
                             },
                             _ => {}
+                        },
+                        Mode::Rating(field) => match key.code {
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                self.mode = match field {
+                                    RatingField::MentalEnergy => Mode::Rating(RatingField::PhysicalEnergy),
+                                    RatingField::PhysicalEnergy => Mode::Rating(RatingField::CognitiveLoad),
+                                    RatingField::CognitiveLoad => Mode::Rating(RatingField::MentalEnergy),
+                                }
+                            },
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                self.mode = match field {
+                                    RatingField::MentalEnergy => Mode::Rating(RatingField::CognitiveLoad),
+                                    RatingField::PhysicalEnergy => Mode::Rating(RatingField::MentalEnergy),
+                                    RatingField::CognitiveLoad => Mode::Rating(RatingField::PhysicalEnergy),
+                                }
+                            },
+                            KeyCode::Char('l') | KeyCode::Right => {
+                                match field {
+                                    RatingField::MentalEnergy => self.rating_mental = (self.rating_mental + 1).min(5),
+                                    RatingField::PhysicalEnergy => self.rating_physical = (self.rating_physical + 1).min(5),
+                                    RatingField::CognitiveLoad => self.rating_cognitive = (self.rating_cognitive + 1).min(5),
+                                }
+                            },
+                            KeyCode::Char('h') | KeyCode::Left => {
+                                match field {
+                                    RatingField::MentalEnergy => self.rating_mental = self.rating_mental.saturating_sub(1),
+                                    RatingField::PhysicalEnergy => self.rating_physical = self.rating_physical.saturating_sub(1),
+                                    RatingField::CognitiveLoad => self.rating_cognitive = self.rating_cognitive.saturating_sub(1),
+                                }
+                            },
+                            KeyCode::Enter => {
+                                self.save_ratings()?;
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Esc => self.mode = Mode::Navigation,
+                            _ => {}
                         }
                     }
                 }
@@ -511,6 +604,17 @@ fn keybinds_bar() -> Paragraph<'static> {
     Paragraph::new(KEYBINDS_TEXT)
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Keybinds"))
+}
+
+fn render_stars(val: u8) -> String {
+    let mut s = String::new();
+    for _ in 0..val {
+        s.push('*');
+    }
+    for _ in val..5 {
+        s.push('-');
+    }
+    s
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
@@ -590,8 +694,8 @@ fn ui(f: &mut Frame, app: &mut App) {
                 .direction(Direction::Horizontal)
                 .constraints(
                     [
-                        Constraint::Percentage(70), // Description on the left
-                        Constraint::Percentage(30), // Duration on the right
+                        Constraint::Percentage(70),
+                        Constraint::Percentage(30),
                     ]
                     .as_ref(),
                 )
@@ -631,19 +735,22 @@ fn ui(f: &mut Frame, app: &mut App) {
     let list_chunk = content_chunks[0];
     let right_chunk = content_chunks[1];
 
+    // Split right chunk into Rating (Top), Tags (Middle), Notes (Bottom)
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
+                Constraint::Length(5), // Ratings (3 lines + border)
+                Constraint::Percentage(40), // Tags
+                Constraint::Min(5),    // Notes
             ]
             .as_ref()
         )
         .split(right_chunk);
     
-    let tags_chunk = right_chunks[0];
-    let notes_chunk = right_chunks[1];
+    let rating_chunk = right_chunks[0];
+    let tags_chunk = right_chunks[1];
+    let notes_chunk = right_chunks[2];
 
     let list_width = list_chunk.width.saturating_sub(5) as usize;
     let items: Vec<ListItem> = app
@@ -681,6 +788,52 @@ fn ui(f: &mut Frame, app: &mut App) {
     
     f.render_stateful_widget(list, list_chunk, &mut app.list_state);
     
+    // --- Ratings Pane ---
+    let (ratings_mental, ratings_physical, ratings_cognitive) = if let Mode::Rating(_) = app.mode {
+        (app.rating_mental, app.rating_physical, app.rating_cognitive)
+    } else {
+        if let Some(idx) = app.list_state.selected() {
+            if let Some(session) = app.filtered_sessions.get(idx) {
+                if let Some(r) = &session.ratings {
+                    (r.mental_energy, r.physical_energy, r.cognitive_load)
+                } else {
+                    (0,0,0)
+                }
+            } else { (0,0,0) }
+        } else { (0,0,0) }
+    };
+
+    let ratings_title = if let Mode::Rating(_) = app.mode { "Ratings (Active)" } else { "Ratings" };
+    let active_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+    
+    // Helper to format line
+    let format_rating_line = |label: &str, val: u8, is_active: bool| {
+        let stars = render_stars(val);
+        let content = format!("{:<16} [{}]", label, stars);
+        if is_active {
+            ratatui::text::Span::styled(content, active_style)
+        } else {
+            ratatui::text::Span::raw(content)
+        }
+    };
+
+    let mut lines = Vec::new();
+    
+    if let Mode::Rating(ref field) = app.mode {
+        lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, *field == RatingField::MentalEnergy)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, *field == RatingField::PhysicalEnergy)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, *field == RatingField::CognitiveLoad)));
+    } else {
+        lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, false)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, false)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, false)));
+    }
+
+    let ratings_widget = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title(ratings_title));
+    f.render_widget(ratings_widget, rating_chunk);
+
+
     // --- Tags Pane ---
     let tags_title = if app.mode == Mode::Tagging {
         "Tags (Active)"

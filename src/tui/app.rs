@@ -1,6 +1,6 @@
 use chrono::{NaiveDate, Utc};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -15,11 +15,8 @@ use ratatui::{
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
 use crate::session::{serialize_session, Session, SessionRatings, SessionState};
-
-const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | z: zen | q: quit | Esc: back";
-
-const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | c: Clear Filter | Esc: Cancel";
+use crate::tui::components::{zen, keybinds, ratings};
+use crate::tui::events;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -54,7 +51,7 @@ pub enum Mode {
 }
 
 pub struct App {
-    sessions: Vec<Session>,
+    pub sessions: Vec<Session>,
     pub filtered_sessions: Vec<Session>,
     pub date_input: String,
     pub search_input: String,
@@ -65,7 +62,7 @@ pub struct App {
     pub creation_duration: String,
     pub creation_description: String,
 
-    // Rating fields (temp storage for editing)
+    // Rating fields
     pub rating_mental: u8,
     pub rating_physical: u8,
     pub rating_cognitive: u8,
@@ -201,7 +198,7 @@ impl App {
         }
     }
 
-    fn save_tags(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn save_tags(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
                 let new_tags: Vec<String> = self
@@ -227,7 +224,7 @@ impl App {
         Ok(())
     }
 
-    fn save_notes(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn save_notes(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
                 let new_notes = self.notes_input.clone();
@@ -247,7 +244,7 @@ impl App {
         Ok(())
     }
 
-    fn save_ratings(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn save_ratings(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
                 let ratings = SessionRatings {
@@ -271,7 +268,7 @@ impl App {
         Ok(())
     }
 
-    fn cancel_session(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn cancel_session(&mut self) -> Result<(), Box<dyn Error>> {
          if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
                 if selected_session.state == SessionState::Running {
@@ -288,7 +285,7 @@ impl App {
          Ok(())
     }
 
-    fn delete_session(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn delete_session(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get(selected_idx) {
                 // Mark as Deleted
@@ -307,7 +304,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_edit_session(
+    pub fn handle_edit_session(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Box<dyn Error>> {
@@ -366,7 +363,7 @@ impl App {
         Ok(())
     }
 
-    fn create_session(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn create_session(&mut self) -> Result<(), Box<dyn Error>> {
         let duration_mins: u64 = self.creation_duration.trim().parse().unwrap_or(25);
         let description = self.creation_description.trim().to_string();
         
@@ -414,215 +411,8 @@ impl App {
 
             if event::poll(Duration::from_millis(250))? {
                 if let Event::Key(key) = event::read()? {
-                    match &self.mode {
-                        Mode::Navigation => match key.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Char('i') => self.mode = Mode::Input(InputField::Date),
-                            KeyCode::Char('/') => self.mode = Mode::Input(InputField::Search),
-                            KeyCode::Char('j') => self.next(),
-                            KeyCode::Char('k') => self.previous(),
-                            KeyCode::Char('t') => {
-                                if let Some(idx) = self.list_state.selected() {
-                                    if let Some(session) = self.filtered_sessions.get(idx) {
-                                        self.tags_input = session.tags.join(", ");
-                                        self.mode = Mode::Tagging;
-                                    }
-                                }
-                            },
-                            KeyCode::Char('n') => {
-                                if let Some(idx) = self.list_state.selected() {
-                                    if let Some(session) = self.filtered_sessions.get(idx) {
-                                        self.notes_input = session.notes.clone();
-                                        self.mode = Mode::Notes;
-                                    }
-                                }
-                            },
-                            KeyCode::Char('r') => {
-                                if let Some(idx) = self.list_state.selected() {
-                                    if let Some(session) = self.filtered_sessions.get(idx) {
-                                        if let Some(ratings) = &session.ratings {
-                                            self.rating_mental = ratings.mental_energy;
-                                            self.rating_physical = ratings.physical_energy;
-                                            self.rating_cognitive = ratings.cognitive_load;
-                                        } else {
-                                            self.rating_mental = 0;
-                                            self.rating_physical = 0;
-                                            self.rating_cognitive = 0;
-                                        }
-                                        self.mode = Mode::Rating(RatingField::MentalEnergy);
-                                    }
-                                }
-                            }
-                            KeyCode::Char('e') => self.handle_edit_session(&mut terminal)?,
-                            KeyCode::Char('a') => {
-                                self.creation_duration = "25".to_string();
-                                self.creation_description = if let Some(first) = self.sessions.first() {
-                                    first.description.clone()
-                                } else {
-                                    String::new()
-                                };
-                                self.mode = Mode::Creation(CreationField::Description);
-                            }
-                            KeyCode::Char('c') => self.cancel_session()?,
-                            KeyCode::Char('x') => {
-                                if self.list_state.selected().is_some() {
-                                    self.mode = Mode::DeleteConfirm;
-                                }
-                            },
-                            KeyCode::Char('f') => {
-                                self.mode = Mode::FastFilter;
-                            },
-                            KeyCode::Char('z') => {
-                                self.mode = Mode::Zen;
-                            },
-                            KeyCode::Tab => {
-                                self.mode = Mode::Input(InputField::Search);
-                            }
-                            _ => {} 
-                        },
-                        Mode::Input(field) => match key.code {
-                            KeyCode::Char(c) => {
-                                match field {
-                                    InputField::Date => self.date_input.push(c),
-                                    InputField::Search => self.search_input.push(c),
-                                }
-                                self.filter_sessions();
-                            }
-                            KeyCode::Backspace => {
-                                match field {
-                                    InputField::Date => { self.date_input.pop(); }
-                                    InputField::Search => { self.search_input.pop(); }
-                                }
-                                self.filter_sessions();
-                            }
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            KeyCode::Tab => {
-                                self.mode = match field {
-                                    InputField::Date => Mode::Input(InputField::Search),
-                                    InputField::Search => Mode::Input(InputField::Date),
-                                }
-                            }
-                            _ => {} 
-                        },
-                        Mode::Tagging => match key.code {
-                            KeyCode::Char(c) => self.tags_input.push(c),
-                            KeyCode::Backspace => {
-                                self.tags_input.pop();
-                            }
-                            KeyCode::Enter => {
-                                self.save_tags()?;
-                                self.mode = Mode::Navigation;
-                            }
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {} 
-                        },
-                        Mode::Notes => match key.code {
-                            KeyCode::Char(c) => self.notes_input.push(c),
-                            KeyCode::Backspace => {
-                                self.notes_input.pop();
-                            },
-                            KeyCode::Enter => {
-                                self.save_notes()?;
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {} 
-                        },
-                        Mode::Creation(field) => match key.code {
-                             KeyCode::Char(c) => match field {
-                                CreationField::Duration => self.creation_duration.push(c),
-                                CreationField::Description => self.creation_description.push(c),
-                            },
-                            KeyCode::Backspace => match field {
-                                CreationField::Duration => { self.creation_duration.pop(); }
-                                CreationField::Description => { self.creation_description.pop(); }
-                            },
-                            KeyCode::Tab => {
-                                self.mode = match field {
-                                    CreationField::Duration => Mode::Creation(CreationField::Description),
-                                    CreationField::Description => Mode::Creation(CreationField::Duration),
-                                }
-                            },
-                            KeyCode::Enter => {
-                                self.create_session()?;
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {} 
-                        },
-                        Mode::DeleteConfirm => match key.code {
-                            KeyCode::Char('y') | KeyCode::Enter => {
-                                self.delete_session()?;
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Char('n') | KeyCode::Esc => {
-                                self.mode = Mode::Navigation;
-                            },
-                            _ => {} 
-                        },
-                        Mode::Rating(field) => match key.code {
-                            KeyCode::Char('j') | KeyCode::Down => {
-                                self.mode = match field {
-                                    RatingField::MentalEnergy => Mode::Rating(RatingField::PhysicalEnergy),
-                                    RatingField::PhysicalEnergy => Mode::Rating(RatingField::CognitiveLoad),
-                                    RatingField::CognitiveLoad => Mode::Rating(RatingField::MentalEnergy),
-                                }
-                            },
-                            KeyCode::Char('k') | KeyCode::Up => {
-                                self.mode = match field {
-                                    RatingField::MentalEnergy => Mode::Rating(RatingField::CognitiveLoad),
-                                    RatingField::PhysicalEnergy => Mode::Rating(RatingField::MentalEnergy),
-                                    RatingField::CognitiveLoad => Mode::Rating(RatingField::PhysicalEnergy),
-                                }
-                            },
-                            KeyCode::Char('l') | KeyCode::Right => {
-                                match field {
-                                    RatingField::MentalEnergy => self.rating_mental = (self.rating_mental + 1).min(5),
-                                    RatingField::PhysicalEnergy => self.rating_physical = (self.rating_physical + 1).min(5),
-                                    RatingField::CognitiveLoad => self.rating_cognitive = (self.rating_cognitive + 1).min(5),
-                                }
-                            },
-                            KeyCode::Char('h') | KeyCode::Left => {
-                                match field {
-                                    RatingField::MentalEnergy => self.rating_mental = self.rating_mental.saturating_sub(1),
-                                    RatingField::PhysicalEnergy => self.rating_physical = self.rating_physical.saturating_sub(1),
-                                    RatingField::CognitiveLoad => self.rating_cognitive = self.rating_cognitive.saturating_sub(1),
-                                }
-                            },
-                            KeyCode::Enter => {
-                                self.save_ratings()?;
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {} 
-                        },
-                        Mode::FastFilter => match key.code {
-                            KeyCode::Char('t') => {
-                                let today = Utc::now().date_naive();
-                                self.date_input = today.format("%Y-%m-%d").to_string();
-                                self.filter_sessions();
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Char('w') => {
-                                let today = Utc::now().date_naive();
-                                let week_ago = today - chrono::Duration::days(7);
-                                self.date_input = format!("{} - {}", week_ago.format("%Y-%m-%d"), today.format("%Y-%m-%d"));
-                                self.filter_sessions();
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Char('c') => {
-                                self.date_input = String::new();
-                                self.filter_sessions();
-                                self.mode = Mode::Navigation;
-                            },
-                            KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {} 
-                        },
-                        Mode::Zen => match key.code {
-                            KeyCode::Char('z') | KeyCode::Esc => self.mode = Mode::Navigation,
-                            KeyCode::Char('q') => break,
-                            _ => {} 
-                        }
+                    if !events::handle_key_event(key, self, &mut terminal)? {
+                        break;
                     }
                 }
             }
@@ -640,326 +430,10 @@ impl App {
     }
 }
 
-fn keybinds_bar() -> Paragraph<'static> {
-    Paragraph::new(KEYBINDS_TEXT)
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Keybinds"))
-}
-
-fn fast_filter_bar() -> Paragraph<'static> {
-    Paragraph::new(FAST_FILTER_TEXT)
-        .style(Style::default().fg(Color::Cyan))
-        .block(Block::default().borders(Borders::ALL).title("Fast Filter"))
-}
-
-fn render_stars(val: u8) -> String {
-    let mut s = String::new();
-    for _ in 0..val {
-        s.push('*');
-    }
-    for _ in val..5 {
-        s.push('-');
-    }
-    s
-}
-
-// 5x7 block font for 0-9 and :
-
-fn to_big_text(s: &str) -> Vec<String> {
-
-    let mut lines = vec![String::new(); 7];
-
-    
-
-    for c in s.chars() {
-
-        let art = match c {
-
-            '0' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "#     #",
-
-                "#     #",
-
-                "#     #",
-
-                "#     #",
-
-                " ##### ",
-
-            ],
-
-            '1' => vec![
-
-                "   #   ",
-
-                "  ##   ",
-
-                "   #   ",
-
-                "   #   ",
-
-                "   #   ",
-
-                "   #   ",
-
-                " ##### ",
-
-            ],
-
-            '2' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "      #",
-
-                " ##### ",
-
-                "#      ",
-
-                "#      ",
-
-                "#######",
-
-            ],
-
-            '3' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "      #",
-
-                " ##### ",
-
-                "      #",
-
-                "#     #",
-
-                " ##### ",
-
-            ],
-
-            '4' => vec![
-
-                "#     #",
-
-                "#     #",
-
-                "#     #",
-
-                "#######",
-
-                "      #",
-
-                "      #",
-
-                "      #",
-
-            ],
-
-            '5' => vec![
-
-                "#######",
-
-                "#      ",
-
-                "#      ",
-
-                "#####  ",
-
-                "     # ",
-
-                "#    # ",
-
-                " ####  ",
-
-            ],
-
-            '6' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "#      ",
-
-                "###### ",
-
-                "#     #",
-
-                "#     #",
-
-                " ##### ",
-
-            ],
-
-            '7' => vec![
-
-                "#######",
-
-                "#    # ",
-
-                "    #  ",
-
-                "   #   ",
-
-                "  #    ",
-
-                "  #    ",
-
-                "  #    ",
-
-            ],
-
-            '8' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "#     #",
-
-                " ##### ",
-
-                "#     #",
-
-                "#     #",
-
-                " ##### ",
-
-            ],
-
-            '9' => vec![
-
-                " ##### ",
-
-                "#     #",
-
-                "#     #",
-
-                " ######",
-
-                "      #",
-
-                "#     #",
-
-                " ##### ",
-
-            ],
-
-            ':' => vec![
-
-                "       ",
-
-                "   #   ",
-
-                "   #   ",
-
-                "       ",
-
-                "   #   ",
-
-                "   #   ",
-
-                "       ",
-
-            ],
-
-            _ => vec![
-
-                "       ",
-
-                "       ",
-
-                "       ",
-
-                "       ",
-
-                "       ",
-
-                "       ",
-
-                "       ",
-
-            ],
-
-        };
-
-        
-
-        for i in 0..7 {
-
-            lines[i].push_str(art[i]);
-
-            lines[i].push_str(" "); // Space between digits
-
-        }
-
-    }
-
-    lines
-
-}
-
-
-
 fn ui(f: &mut Frame, app: &mut App) {
     if app.mode == Mode::Zen {
         let running_session = app.sessions.iter().find(|s| s.state == SessionState::Running);
-        
-        let area = f.area();
-        let vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(30),
-                Constraint::Percentage(40),
-                Constraint::Percentage(30),
-            ].as_ref())
-            .split(area);
-
-        if let Some(s) = running_session {
-             let remaining = s.remaining_duration();
-             let mins = remaining.as_secs() / 60;
-             let secs = remaining.as_secs() % 60;
-             let time_str = format!("{:02}:{:02}", mins, secs);
-             
-             let big_text_lines = to_big_text(&time_str);
-             
-             let mut lines = Vec::new();
-             
-             // Description (Above)
-             lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(s.description.clone(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
-             
-             // Spacing
-             lines.push(ratatui::text::Line::from(""));
-             lines.push(ratatui::text::Line::from(""));
-             
-             // Time (Below)
-             for l in big_text_lines {
-                 lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(l, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
-             }
-
-             let p = Paragraph::new(lines)
-                .alignment(ratatui::layout::Alignment::Center);
-             
-             // Center vertically in the middle chunk
-             f.render_widget(p, vertical[1]);
-
-        } else {
-             let p = Paragraph::new("No active session")
-                .alignment(ratatui::layout::Alignment::Center)
-                .style(Style::default().fg(Color::Red));
-             f.render_widget(p, vertical[1]);
-        };
-        
+        zen::render(f, running_session);
         return;
     }
 
@@ -1044,7 +518,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     // --- Middle Area ---
     if let Some(m_chunk) = middle_chunk {
         if let Mode::Creation(ref field) = app.mode {
-             let creation_chunks = Layout::default() 
+             let creation_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
                     [
@@ -1186,9 +660,10 @@ fn ui(f: &mut Frame, app: &mut App) {
     let ratings_title = if let Mode::Rating(_) = app.mode { "Ratings (Active)" } else { "Ratings" };
     let active_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
     
+    // Use helper from ratings component
     let format_rating_line = |label: &str, val: u8, is_active: bool| {
-        let stars = render_stars(val);
-        let content = format!("{:<16} [{}]\n", label, stars);
+        let stars = ratings::render_stars(val);
+        let content = format!("{:<16} [{}]", label, stars);
         if is_active {
             ratatui::text::Span::styled(content, active_style)
         } else {
@@ -1268,10 +743,10 @@ fn ui(f: &mut Frame, app: &mut App) {
     f.render_widget(notes_widget, notes_chunk);
     
     if let Some(chunk) = fast_filter_chunk {
-        f.render_widget(fast_filter_bar(), chunk);
+        f.render_widget(keybinds::render_fast_filter(), chunk);
     }
     
-    f.render_widget(keybinds_bar(), keybinds_chunk);
+    f.render_widget(keybinds::render_keybinds(), keybinds_chunk);
 
     // --- Cursor ---
     match app.mode {
@@ -1299,30 +774,30 @@ fn ui(f: &mut Frame, app: &mut App) {
                 notes_chunk.y + 1,
             ));
         }
-        Mode::Creation(CreationField::Description) => {
+        Mode::Creation(CreationField::Duration) => {
             if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default() 
+                 let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
                     .split(m_chunk);
                  f.set_cursor_position((
-                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
-                    creation_chunks[0].y + 1,
-                ));
-            }
-        }
-        Mode::Creation(CreationField::Duration) => {
-            if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default() 
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-                    .split(m_chunk);
-                f.set_cursor_position((
                     creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
                     creation_chunks[1].y + 1,
                 ));
             }
         }
-        _ => {} 
+        Mode::Creation(CreationField::Description) => {
+            if let Some(m_chunk) = middle_chunk {
+                 let creation_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+                    .split(m_chunk);
+                f.set_cursor_position((
+                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
+                    creation_chunks[0].y + 1,
+                ));
+            }
+        }
+        _ => {}
     }
 }

@@ -663,37 +663,303 @@ fn render_stars(val: u8) -> String {
     s
 }
 
+// 5x7 block font for 0-9 and :
+
+fn to_big_text(s: &str) -> Vec<String> {
+
+    let mut lines = vec![String::new(); 7];
+
+    
+
+    for c in s.chars() {
+
+        let art = match c {
+
+            '0' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "#     #",
+
+                "#     #",
+
+                "#     #",
+
+                "#     #",
+
+                " ##### ",
+
+            ],
+
+            '1' => vec![
+
+                "   #   ",
+
+                "  ##   ",
+
+                "   #   ",
+
+                "   #   ",
+
+                "   #   ",
+
+                "   #   ",
+
+                " ##### ",
+
+            ],
+
+            '2' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "      #",
+
+                " ##### ",
+
+                "#      ",
+
+                "#      ",
+
+                "#######",
+
+            ],
+
+            '3' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "      #",
+
+                " ##### ",
+
+                "      #",
+
+                "#     #",
+
+                " ##### ",
+
+            ],
+
+            '4' => vec![
+
+                "#     #",
+
+                "#     #",
+
+                "#     #",
+
+                "#######",
+
+                "      #",
+
+                "      #",
+
+                "      #",
+
+            ],
+
+            '5' => vec![
+
+                "#######",
+
+                "#      ",
+
+                "#      ",
+
+                "#####  ",
+
+                "     # ",
+
+                "#    # ",
+
+                " ####  ",
+
+            ],
+
+            '6' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "#      ",
+
+                "###### ",
+
+                "#     #",
+
+                "#     #",
+
+                " ##### ",
+
+            ],
+
+            '7' => vec![
+
+                "#######",
+
+                "#    # ",
+
+                "    #  ",
+
+                "   #   ",
+
+                "  #    ",
+
+                "  #    ",
+
+                "  #    ",
+
+            ],
+
+            '8' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "#     #",
+
+                " ##### ",
+
+                "#     #",
+
+                "#     #",
+
+                " ##### ",
+
+            ],
+
+            '9' => vec![
+
+                " ##### ",
+
+                "#     #",
+
+                "#     #",
+
+                " ######",
+
+                "      #",
+
+                "#     #",
+
+                " ##### ",
+
+            ],
+
+            ':' => vec![
+
+                "       ",
+
+                "   #   ",
+
+                "   #   ",
+
+                "       ",
+
+                "   #   ",
+
+                "   #   ",
+
+                "       ",
+
+            ],
+
+            _ => vec![
+
+                "       ",
+
+                "       ",
+
+                "       ",
+
+                "       ",
+
+                "       ",
+
+                "       ",
+
+                "       ",
+
+            ],
+
+        };
+
+        
+
+        for i in 0..7 {
+
+            lines[i].push_str(art[i]);
+
+            lines[i].push_str(" "); // Space between digits
+
+        }
+
+    }
+
+    lines
+
+}
+
+
+
 fn ui(f: &mut Frame, app: &mut App) {
     if app.mode == Mode::Zen {
         let running_session = app.sessions.iter().find(|s| s.state == SessionState::Running);
         
-        let text = if let Some(s) = running_session {
-             let remaining = s.remaining_duration();
-             let mins = remaining.as_secs() / 60;
-             let secs = remaining.as_secs() % 60;
-             
-             format!("{}\n\nTime Remaining:\n{:02}:{:02}", s.description, mins, secs)
-        } else {
-             "No active session".to_string()
-        };
-        
-        let p = Paragraph::new(text)
-            .alignment(ratatui::layout::Alignment::Center)
-            .style(Style::default().add_modifier(Modifier::BOLD))
-            .block(Block::default().borders(Borders::ALL));
-            
-        // Use a centered chunk for nicer look
         let area = f.area();
         let vertical = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
+                Constraint::Percentage(30),
                 Constraint::Percentage(40),
-                Constraint::Percentage(20),
-                Constraint::Percentage(40),
+                Constraint::Percentage(30),
             ].as_ref())
             .split(area);
+
+        if let Some(s) = running_session {
+             let remaining = s.remaining_duration();
+             let mins = remaining.as_secs() / 60;
+             let secs = remaining.as_secs() % 60;
+             let time_str = format!("{:02}:{:02}", mins, secs);
+             
+             let big_text_lines = to_big_text(&time_str);
+             
+             let mut lines = Vec::new();
+             
+             // Description (Above)
+             lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(s.description.clone(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+             
+             // Spacing
+             lines.push(ratatui::text::Line::from(""));
+             lines.push(ratatui::text::Line::from(""));
+             
+             // Time (Below)
+             for l in big_text_lines {
+                 lines.push(ratatui::text::Line::from(ratatui::text::Span::styled(l, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
+             }
+
+             let p = Paragraph::new(lines)
+                .alignment(ratatui::layout::Alignment::Center);
+             
+             // Center vertically in the middle chunk
+             f.render_widget(p, vertical[1]);
+
+        } else {
+             let p = Paragraph::new("No active session")
+                .alignment(ratatui::layout::Alignment::Center)
+                .style(Style::default().fg(Color::Red));
+             f.render_widget(p, vertical[1]);
+        };
         
-        f.render_widget(p, vertical[1]);
         return;
     }
 
@@ -778,7 +1044,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     // --- Middle Area ---
     if let Some(m_chunk) = middle_chunk {
         if let Mode::Creation(ref field) = app.mode {
-             let creation_chunks = Layout::default()
+             let creation_chunks = Layout::default() 
                 .direction(Direction::Horizontal)
                 .constraints(
                     [
@@ -922,8 +1188,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     
     let format_rating_line = |label: &str, val: u8, is_active: bool| {
         let stars = render_stars(val);
-        let content = format!("{:<16} [{}]
-", label, stars);
+        let content = format!("{:<16} [{}]\n", label, stars);
         if is_active {
             ratatui::text::Span::styled(content, active_style)
         } else {
@@ -1034,27 +1299,27 @@ fn ui(f: &mut Frame, app: &mut App) {
                 notes_chunk.y + 1,
             ));
         }
-        Mode::Creation(CreationField::Duration) => {
+        Mode::Creation(CreationField::Description) => {
             if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default()
+                 let creation_chunks = Layout::default() 
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
                     .split(m_chunk);
                  f.set_cursor_position((
-                    creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
-                    creation_chunks[1].y + 1,
+                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
+                    creation_chunks[0].y + 1,
                 ));
             }
         }
-        Mode::Creation(CreationField::Description) => {
+        Mode::Creation(CreationField::Duration) => {
             if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default()
+                 let creation_chunks = Layout::default() 
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
                     .split(m_chunk);
                 f.set_cursor_position((
-                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
-                    creation_chunks[0].y + 1,
+                    creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
+                    creation_chunks[1].y + 1,
                 ));
             }
         }

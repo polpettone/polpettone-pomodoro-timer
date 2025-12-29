@@ -778,7 +778,19 @@ fn ui(f: &mut Frame, app: &mut App) {
         )
         .split(main_content_chunk);
     
-    let list_chunk = content_chunks[0];
+    let list_area_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
+        .split(content_chunks[0]);
+
+    let list_chunk = list_area_chunks[0];
+    let summary_chunk = list_area_chunks[1];
     let right_chunk = content_chunks[1];
 
     let right_chunks = Layout::default()
@@ -832,6 +844,19 @@ fn ui(f: &mut Frame, app: &mut App) {
         .highlight_symbol("> ");
     
     f.render_stateful_widget(list, list_chunk, &mut app.list_state);
+
+    // --- Summary Bar ---
+    let total_count = app.filtered_sessions.len();
+    let total_duration: Duration = app.filtered_sessions.iter().map(|s| s.duration).sum();
+    let total_mins = total_duration.as_secs() / 60;
+    let total_hours = total_mins / 60;
+    let remaining_mins = total_mins % 60;
+    
+    let summary_text = format!("Count: {} | Total Duration: {:02}:{:02}", total_count, total_hours, remaining_mins);
+    
+    let summary_paragraph = Paragraph::new(summary_text)
+        .style(Style::default().fg(Color::Cyan));
+    f.render_widget(summary_paragraph, summary_chunk);
     
     // --- Ratings Pane ---
     let (ratings_mental, ratings_physical, ratings_cognitive) = if let Mode::Rating(_) = app.mode {

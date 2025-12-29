@@ -17,7 +17,9 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 use crate::session::{serialize_session, Session, SessionRatings, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | q: quit | Esc: back";
+
+const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | Esc: Cancel";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -47,6 +49,7 @@ pub enum Mode {
     Notes,
     DeleteConfirm,
     Rating(RatingField),
+    FastFilter,
 }
 
 pub struct App {
@@ -465,6 +468,9 @@ impl App {
                                     self.mode = Mode::DeleteConfirm;
                                 }
                             },
+                            KeyCode::Char('f') => {
+                                self.mode = Mode::FastFilter;
+                            },
                             KeyCode::Tab => {
                                 self.mode = Mode::Input(InputField::Search);
                             }
@@ -585,6 +591,23 @@ impl App {
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
                             _ => {}
+                        },
+                        Mode::FastFilter => match key.code {
+                            KeyCode::Char('t') => {
+                                let today = Utc::now().date_naive();
+                                self.date_input = today.format("%Y-%m-%d").to_string();
+                                self.filter_sessions();
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Char('w') => {
+                                let today = Utc::now().date_naive();
+                                let week_ago = today - chrono::Duration::days(7);
+                                self.date_input = format!("{} - {}", week_ago.format("%Y-%m-%d"), today.format("%Y-%m-%d"));
+                                self.filter_sessions();
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Esc => self.mode = Mode::Navigation,
+                            _ => {}
                         }
                     }
                 }
@@ -607,6 +630,12 @@ fn keybinds_bar() -> Paragraph<'static> {
     Paragraph::new(KEYBINDS_TEXT)
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Keybinds"))
+}
+
+fn fast_filter_bar() -> Paragraph<'static> {
+    Paragraph::new(FAST_FILTER_TEXT)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Fast Filter"))
 }
 
 fn render_stars(val: u8) -> String {
@@ -635,6 +664,13 @@ fn ui(f: &mut Frame, app: &mut App) {
             Constraint::Min(0),    
             Constraint::Length(3), 
         ]
+    } else if app.mode == Mode::FastFilter {
+        vec![
+            Constraint::Length(3), 
+            Constraint::Min(0),    
+            Constraint::Length(3), 
+            Constraint::Length(3), 
+        ]
     } else {
         vec![
             Constraint::Length(3), 
@@ -650,12 +686,14 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     let top_chunk = chunks[0];
-    let (middle_chunk, main_content_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
-        (Some(chunks[1]), chunks[2], chunks[3])
+    let (middle_chunk, main_content_chunk, fast_filter_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
+        (Some(chunks[1]), chunks[2], None, chunks[3])
     } else if app.mode == Mode::DeleteConfirm {
-        (Some(chunks[1]), chunks[2], chunks[3])
+        (Some(chunks[1]), chunks[2], None, chunks[3])
+    } else if app.mode == Mode::FastFilter {
+        (None, chunks[1], Some(chunks[2]), chunks[3])
     } else {
-        (None, chunks[1], chunks[2])
+        (None, chunks[1], None, chunks[2])
     };
 
     let top_chunks = Layout::default()
@@ -738,14 +776,13 @@ fn ui(f: &mut Frame, app: &mut App) {
     let list_chunk = content_chunks[0];
     let right_chunk = content_chunks[1];
 
-    // Split right chunk into Rating (Top), Tags (Middle), Notes (Bottom)
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(5), // Ratings (3 lines + border)
-                Constraint::Percentage(40), // Tags
-                Constraint::Min(5),    // Notes
+                Constraint::Length(5), 
+                Constraint::Percentage(40), 
+                Constraint::Min(5),    
             ]
             .as_ref()
         )
@@ -809,7 +846,6 @@ fn ui(f: &mut Frame, app: &mut App) {
     let ratings_title = if let Mode::Rating(_) = app.mode { "Ratings (Active)" } else { "Ratings" };
     let active_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
     
-    // Helper to format line
     let format_rating_line = |label: &str, val: u8, is_active: bool| {
         let stars = render_stars(val);
         let content = format!("{:<16} [{}]", label, stars);
@@ -890,6 +926,10 @@ fn ui(f: &mut Frame, app: &mut App) {
         .wrap(ratatui::widgets::Wrap { trim: true });
     
     f.render_widget(notes_widget, notes_chunk);
+    
+    if let Some(chunk) = fast_filter_chunk {
+        f.render_widget(fast_filter_bar(), chunk);
+    }
     
     f.render_widget(keybinds_bar(), keybinds_chunk);
 

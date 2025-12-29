@@ -19,7 +19,7 @@ use crate::session::{serialize_session, Session, SessionRatings, SessionState};
 const KEYBINDS_TEXT: &str =
     "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | q: quit | Esc: back";
 
-const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | Esc: Cancel";
+const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | c: Clear Filter | Esc: Cancel";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -603,6 +603,11 @@ impl App {
                                 let today = Utc::now().date_naive();
                                 let week_ago = today - chrono::Duration::days(7);
                                 self.date_input = format!("{} - {}", week_ago.format("%Y-%m-%d"), today.format("%Y-%m-%d"));
+                                self.filter_sessions();
+                                self.mode = Mode::Navigation;
+                            },
+                            KeyCode::Char('c') => {
+                                self.date_input = String::new();
                                 self.filter_sessions();
                                 self.mode = Mode::Navigation;
                             },

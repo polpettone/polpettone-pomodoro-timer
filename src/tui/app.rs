@@ -87,13 +87,8 @@ impl App {
             }
         }
 
-        let mut list_state = ListState::default();
-        if !sessions.is_empty() {
-            list_state.select(Some(0));
-        }
-
-        App {
-            filtered_sessions: sessions.clone(),
+        let mut app = App {
+            filtered_sessions: Vec::new(),
             sessions,
             date_input: String::new(),
             search_input: String::new(),
@@ -105,9 +100,17 @@ impl App {
             rating_physical: 0,
             rating_cognitive: 0,
             mode: Mode::Navigation,
-            list_state,
+            list_state: ListState::default(),
             session_dir,
+        };
+
+        app.filter_sessions();
+
+        if !app.filtered_sessions.is_empty() {
+            app.list_state.select(Some(0));
         }
+
+        app
     }
 
     pub fn next(&mut self) {

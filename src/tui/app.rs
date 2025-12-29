@@ -17,7 +17,7 @@ use std::{env, error::Error, fs, io, process::Command, time::Duration};
 use crate::session::{serialize_session, Session, SessionRatings, SessionState};
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | z: zen | q: quit | Esc: back";
 
 const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | c: Clear Filter | Esc: Cancel";
 
@@ -50,6 +50,7 @@ pub enum Mode {
     DeleteConfirm,
     Rating(RatingField),
     FastFilter,
+    Zen,
 }
 
 pub struct App {
@@ -471,10 +472,13 @@ impl App {
                             KeyCode::Char('f') => {
                                 self.mode = Mode::FastFilter;
                             },
+                            KeyCode::Char('z') => {
+                                self.mode = Mode::Zen;
+                            },
                             KeyCode::Tab => {
                                 self.mode = Mode::Input(InputField::Search);
                             }
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::Input(field) => match key.code {
                             KeyCode::Char(c) => {
@@ -498,7 +502,7 @@ impl App {
                                     InputField::Search => Mode::Input(InputField::Date),
                                 }
                             }
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::Tagging => match key.code {
                             KeyCode::Char(c) => self.tags_input.push(c),
@@ -510,7 +514,7 @@ impl App {
                                 self.mode = Mode::Navigation;
                             }
                             KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::Notes => match key.code {
                             KeyCode::Char(c) => self.notes_input.push(c),
@@ -522,7 +526,7 @@ impl App {
                                 self.mode = Mode::Navigation;
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::Creation(field) => match key.code {
                              KeyCode::Char(c) => match field {
@@ -544,7 +548,7 @@ impl App {
                                 self.mode = Mode::Navigation;
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::DeleteConfirm => match key.code {
                             KeyCode::Char('y') | KeyCode::Enter => {
@@ -554,7 +558,7 @@ impl App {
                             KeyCode::Char('n') | KeyCode::Esc => {
                                 self.mode = Mode::Navigation;
                             },
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::Rating(field) => match key.code {
                             KeyCode::Char('j') | KeyCode::Down => {
@@ -590,7 +594,7 @@ impl App {
                                 self.mode = Mode::Navigation;
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {}
+                            _ => {} 
                         },
                         Mode::FastFilter => match key.code {
                             KeyCode::Char('t') => {
@@ -612,7 +616,12 @@ impl App {
                                 self.mode = Mode::Navigation;
                             },
                             KeyCode::Esc => self.mode = Mode::Navigation,
-                            _ => {}
+                            _ => {} 
+                        },
+                        Mode::Zen => match key.code {
+                            KeyCode::Char('z') | KeyCode::Esc => self.mode = Mode::Navigation,
+                            KeyCode::Char('q') => break,
+                            _ => {} 
                         }
                     }
                 }
@@ -655,6 +664,39 @@ fn render_stars(val: u8) -> String {
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
+    if app.mode == Mode::Zen {
+        let running_session = app.sessions.iter().find(|s| s.state == SessionState::Running);
+        
+        let text = if let Some(s) = running_session {
+             let remaining = s.remaining_duration();
+             let mins = remaining.as_secs() / 60;
+             let secs = remaining.as_secs() % 60;
+             
+             format!("{}\n\nTime Remaining:\n{:02}:{:02}", s.description, mins, secs)
+        } else {
+             "No active session".to_string()
+        };
+        
+        let p = Paragraph::new(text)
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().add_modifier(Modifier::BOLD))
+            .block(Block::default().borders(Borders::ALL));
+            
+        // Use a centered chunk for nicer look
+        let area = f.area();
+        let vertical = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(40),
+                Constraint::Percentage(20),
+                Constraint::Percentage(40),
+            ].as_ref())
+            .split(area);
+        
+        f.render_widget(p, vertical[1]);
+        return;
+    }
+
     let constraints = if let Mode::Creation(_) = app.mode {
         vec![
             Constraint::Length(3), 
@@ -778,19 +820,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         )
         .split(main_content_chunk);
     
-    let list_area_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
-        .split(content_chunks[0]);
-
-    let list_chunk = list_area_chunks[0];
-    let summary_chunk = list_area_chunks[1];
+    let list_chunk = content_chunks[0];
     let right_chunk = content_chunks[1];
 
     let right_chunks = Layout::default()
@@ -809,7 +839,21 @@ fn ui(f: &mut Frame, app: &mut App) {
     let tags_chunk = right_chunks[1];
     let notes_chunk = right_chunks[2];
 
-    let list_width = list_chunk.width.saturating_sub(5) as usize;
+    let list_area_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
+        .split(list_chunk);
+
+    let list_items_chunk = list_area_chunks[0];
+    let summary_chunk = list_area_chunks[1];
+
+    let list_width = list_items_chunk.width.saturating_sub(5) as usize;
     let items: Vec<ListItem> = app
         .filtered_sessions
         .iter()
@@ -843,7 +887,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
     
-    f.render_stateful_widget(list, list_chunk, &mut app.list_state);
+    f.render_stateful_widget(list, list_items_chunk, &mut app.list_state);
 
     // --- Summary Bar ---
     let total_count = app.filtered_sessions.len();
@@ -878,7 +922,8 @@ fn ui(f: &mut Frame, app: &mut App) {
     
     let format_rating_line = |label: &str, val: u8, is_active: bool| {
         let stars = render_stars(val);
-        let content = format!("{:<16} [{}]", label, stars);
+        let content = format!("{:<16} [{}]
+", label, stars);
         if is_active {
             ratatui::text::Span::styled(content, active_style)
         } else {
@@ -989,30 +1034,30 @@ fn ui(f: &mut Frame, app: &mut App) {
                 notes_chunk.y + 1,
             ));
         }
-        Mode::Creation(CreationField::Description) => {
-            if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-                    .split(m_chunk);
-                 f.set_cursor_position((
-                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
-                    creation_chunks[0].y + 1,
-                ));
-            }
-        }
         Mode::Creation(CreationField::Duration) => {
             if let Some(m_chunk) = middle_chunk {
                  let creation_chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
                     .split(m_chunk);
-                f.set_cursor_position((
+                 f.set_cursor_position((
                     creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
                     creation_chunks[1].y + 1,
                 ));
             }
         }
-        _ => {}
+        Mode::Creation(CreationField::Description) => {
+            if let Some(m_chunk) = middle_chunk {
+                 let creation_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+                    .split(m_chunk);
+                f.set_cursor_position((
+                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
+                    creation_chunks[0].y + 1,
+                ));
+            }
+        }
+        _ => {} 
     }
 }

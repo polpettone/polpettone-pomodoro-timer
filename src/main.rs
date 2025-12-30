@@ -84,8 +84,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    let pomodoro_session_dir = std::env::var("POMODORO_SESSION_DIR")
+        .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir);
+
     let session_service = SessionService {
-        pomodoro_session_dir: config.pomodoro_config.pomodoro_session_dir,
+        pomodoro_session_dir,
     };
 
     match opts.cmd {

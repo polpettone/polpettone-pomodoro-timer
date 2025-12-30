@@ -1,0 +1,11 @@
+description: Implement feature X
+duration:
+  secs: 1500
+  nanos: 0
+start: 2025-12-04 10:19:21
+tags:
+- urgent
+- rust
+notes: ''
+state: Done
+ratings: null

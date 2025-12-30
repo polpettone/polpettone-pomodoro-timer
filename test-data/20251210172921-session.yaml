@@ -1,0 +1,13 @@
+description: Setup environment
+duration:
+  secs: 1500
+  nanos: 0
+start: 2025-12-10 17:29:21
+tags:
+- rust
+notes: ''
+state: Done
+ratings:
+  mental_energy: 4
+  physical_energy: 2
+  cognitive_load: 4

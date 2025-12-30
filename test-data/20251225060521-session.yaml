@@ -1,0 +1,14 @@
+description: Fix bug Y
+duration:
+  secs: 1500
+  nanos: 0
+start: 2025-12-25 06:05:21
+tags:
+- learning
+- fun
+notes: ''
+state: Done
+ratings:
+  mental_energy: 3
+  physical_energy: 2
+  cognitive_load: 3

@@ -1,0 +1,12 @@
+description: Fix bug Y
+duration:
+  secs: 1500
+  nanos: 0
+start: 2025-11-30 22:17:21
+tags: []
+notes: Generated test note.
+state: Done
+ratings:
+  mental_energy: 3
+  physical_energy: 4
+  cognitive_load: 5

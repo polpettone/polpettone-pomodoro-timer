@@ -33,4 +33,8 @@ pub enum Command {
         #[structopt(short = "e", long = "export")]
         export: bool,
     },
+    GenerateTestData {
+        #[structopt(short = "n", long = "number", default_value = "50")]
+        number: u32,
+    },
 }

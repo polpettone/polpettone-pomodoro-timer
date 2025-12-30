@@ -8,14 +8,13 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::ListState,
     Frame, Terminal,
 };
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
 use crate::session::{serialize_session, Session, SessionRatings, SessionState};
-use crate::tui::components::{zen, keybinds, ratings};
+use crate::tui::components::{filter_bar, info_pane, keybinds, overlay_bar, session_list, zen};
 use crate::tui::events;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -58,11 +57,9 @@ pub struct App {
     pub tags_input: String,
     pub notes_input: String,
     
-    // Creation fields
     pub creation_duration: String,
     pub creation_description: String,
 
-    // Rating fields
     pub rating_mental: u8,
     pub rating_physical: u8,
     pub rating_cognitive: u8,
@@ -77,7 +74,6 @@ impl App {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
         
-        // Auto-update expired running sessions to Done
         for session in sessions.iter_mut() {
             if session.state == SessionState::Running {
                 let remaining = session.remaining_duration();
@@ -282,17 +278,15 @@ impl App {
                 }
             }
          }
-         Ok(())
+          Ok(())
     }
 
     pub fn delete_session(&mut self) -> Result<(), Box<dyn Error>> {
         if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get(selected_idx) {
-                // Mark as Deleted
                 let mut deleted_session = selected_session.clone();
                 deleted_session.state = SessionState::Deleted;
 
-                // Update main list
                 if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
                     original_session.state = SessionState::Deleted;
                 }
@@ -483,321 +477,42 @@ fn ui(f: &mut Frame, app: &mut App) {
         (None, chunks[1], None, chunks[2])
     };
 
-    let top_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(50), 
-                Constraint::Percentage(50), 
-            ]
-            .as_ref(),
-        )
-        .split(top_chunk);
-    
-    let date_chunk = top_chunks[0];
-    let search_chunk = top_chunks[1];
+    // --- Filter Bar ---
+    filter_bar::render(f, top_chunk, app);
 
-    let date_title = if let Mode::Input(InputField::Date) = app.mode {
-        "Date (Active)"
-    } else {
-        "Date"
-    };
-    let date_input = Paragraph::new(app.date_input.as_str())
-        .block(Block::default().borders(Borders::ALL).title(date_title));
-    f.render_widget(date_input, date_chunk);
-
-    let search_title = if let Mode::Input(InputField::Search) = app.mode {
-        "Search (Active)"
-    } else {
-        "Search (/)"
-    };
-    let search_input = Paragraph::new(app.search_input.as_str())
-        .block(Block::default().borders(Borders::ALL).title(search_title));
-    f.render_widget(search_input, search_chunk);
-
-    // --- Middle Area ---
+    // --- Overlay Bar (Creation or Delete Confirm) ---
     if let Some(m_chunk) = middle_chunk {
-        if let Mode::Creation(ref field) = app.mode {
-             let creation_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(
-                    [
-                        Constraint::Percentage(70),
-                        Constraint::Percentage(30),
-                    ]
-                    .as_ref(),
-                )
-                .split(m_chunk);
-
-             let desc_title = if let CreationField::Description = field { "Description (Active)" } else { "Description" };
-             let duration_title = if let CreationField::Duration = field { "Duration (min) (Active)" } else { "Duration (min)" };
-             
-             let desc_input = Paragraph::new(app.creation_description.as_str())
-                .block(Block::default().borders(Borders::ALL).title(desc_title));
-             f.render_widget(desc_input, creation_chunks[0]);
-
-             let duration_input = Paragraph::new(app.creation_duration.as_str())
-                .block(Block::default().borders(Borders::ALL).title(duration_title));
-             f.render_widget(duration_input, creation_chunks[1]);
-        } else if app.mode == Mode::DeleteConfirm {
-            let confirm_text = "Are you sure you want to delete this session? (y/n)";
-            let confirm_paragraph = Paragraph::new(confirm_text)
-                .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-                .block(Block::default().borders(Borders::ALL).title("Delete Confirmation"))
-                .alignment(ratatui::layout::Alignment::Center);
-            f.render_widget(confirm_paragraph, m_chunk);
-        }
+        overlay_bar::render(f, m_chunk, app);
     }
 
     let content_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(70),
-                Constraint::Percentage(30),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(main_content_chunk);
     
-    let list_chunk = content_chunks[0];
-    let right_chunk = content_chunks[1];
+    let list_area = content_chunks[0];
+    let right_pane_area = content_chunks[1];
 
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(5), 
-                Constraint::Percentage(40), 
-                Constraint::Min(5),    
-            ]
-            .as_ref()
-        )
-        .split(right_chunk);
+    // --- Session List ---
+    session_list::render(f, list_area, app);
+
+    // --- Info Pane (Ratings, Tags, Notes) ---
+    info_pane::render(f, right_pane_area, app);
     
-    let rating_chunk = right_chunks[0];
-    let tags_chunk = right_chunks[1];
-    let notes_chunk = right_chunks[2];
-
-    let list_area_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
-        .split(list_chunk);
-
-    let list_items_chunk = list_area_chunks[0];
-    let summary_chunk = list_area_chunks[1];
-
-    let list_width = list_items_chunk.width.saturating_sub(5) as usize;
-    let items: Vec<ListItem> = app
-        .filtered_sessions
-        .iter()
-        .map(|s| {
-            let base_text = s.to_string();
-            let status_text = match s.state {
-                SessionState::Running => {
-                     let remaining = s.remaining_duration();
-                     if remaining.as_secs() == 0 {
-                         "[Done]".to_string()
-                     } else {
-                         let mins = remaining.as_secs() / 60;
-                         let secs = remaining.as_secs() % 60;
-                         format!("[Running: {:02}:{:02}]", mins, secs)
-                     }
-                },
-                SessionState::Done => "[Done]".to_string(),
-                SessionState::Canceled => "[Canceled]".to_string(),
-                SessionState::Deleted => "[Deleted]".to_string(),
-            };
-
-            let content_len = base_text.chars().count() + status_text.chars().count();
-            let padding_len = list_width.saturating_sub(content_len);
-            let padding = " ".repeat(padding_len);
-            
-            ListItem::new(format!("{}{}{}", base_text, padding, status_text))
-        })
-        .collect();
-    let list = List::new(items)
-        .block(Block::default().title("Sessions").borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("> ");
-    
-    f.render_stateful_widget(list, list_items_chunk, &mut app.list_state);
-
-    // --- Summary Bar ---
-    let total_count = app.filtered_sessions.len();
-    let total_duration: Duration = app.filtered_sessions.iter().map(|s| s.duration).sum();
-    let total_mins = total_duration.as_secs() / 60;
-    let total_hours = total_mins / 60;
-    let remaining_mins = total_mins % 60;
-    
-    let summary_text = format!("Count: {} | Total Duration: {:02}:{:02}", total_count, total_hours, remaining_mins);
-    
-    let summary_paragraph = Paragraph::new(summary_text)
-        .style(Style::default().fg(Color::Cyan));
-    f.render_widget(summary_paragraph, summary_chunk);
-    
-    // --- Ratings Pane ---
-    let (ratings_mental, ratings_physical, ratings_cognitive) = if let Mode::Rating(_) = app.mode {
-        (app.rating_mental, app.rating_physical, app.rating_cognitive)
-    } else {
-        if let Some(idx) = app.list_state.selected() {
-            if let Some(session) = app.filtered_sessions.get(idx) {
-                if let Some(r) = &session.ratings {
-                    (r.mental_energy, r.physical_energy, r.cognitive_load)
-                } else {
-                    (0,0,0)
-                }
-            } else { (0,0,0) }
-        } else { (0,0,0) }
-    };
-
-    let ratings_title = if let Mode::Rating(_) = app.mode { "Ratings (Active)" } else { "Ratings" };
-    let active_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
-    
-    // Use helper from ratings component
-    let format_rating_line = |label: &str, val: u8, is_active: bool| {
-        let stars = ratings::render_stars(val);
-        let content = format!("{:<16} [{}]", label, stars);
-        if is_active {
-            ratatui::text::Span::styled(content, active_style)
-        } else {
-            ratatui::text::Span::raw(content)
-        }
-    };
-
-    let mut lines = Vec::new();
-    
-    if let Mode::Rating(ref field) = app.mode {
-        lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, *field == RatingField::MentalEnergy)));
-        lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, *field == RatingField::PhysicalEnergy)));
-        lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, *field == RatingField::CognitiveLoad)));
-    } else {
-        lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, false)));
-        lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, false)));
-        lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, false)));
-    }
-
-    let ratings_widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title(ratings_title));
-    f.render_widget(ratings_widget, rating_chunk);
-
-
-    // --- Tags Pane ---
-    let tags_title = if app.mode == Mode::Tagging {
-        "Tags (Active)"
-    } else {
-        "Tags"
-    };
-
-    let tags_text = if app.mode == Mode::Tagging {
-        app.tags_input.clone()
-    } else {
-            if let Some(idx) = app.list_state.selected() {
-            if let Some(session) = app.filtered_sessions.get(idx) {
-                session.tags.join(", ")
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        }
-    };
-
-    let tags_widget = Paragraph::new(tags_text)
-        .block(Block::default().borders(Borders::ALL).title(tags_title))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-    
-    f.render_widget(tags_widget, tags_chunk);
-
-    // --- Notes Pane ---
-    let notes_title = if app.mode == Mode::Notes {
-        "Notes (Active)"
-    } else {
-        "Notes"
-    };
-
-    let notes_text = if app.mode == Mode::Notes {
-        app.notes_input.clone()
-    } else {
-        if let Some(idx) = app.list_state.selected() {
-            if let Some(session) = app.filtered_sessions.get(idx) {
-                session.notes.clone()
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        }
-    };
-
-    let notes_widget = Paragraph::new(notes_text)
-        .block(Block::default().borders(Borders::ALL).title(notes_title))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-    
-    f.render_widget(notes_widget, notes_chunk);
-    
+    // --- Keybinds & Fast Filter ---
     if let Some(chunk) = fast_filter_chunk {
         f.render_widget(keybinds::render_fast_filter(), chunk);
     }
-    
     f.render_widget(keybinds::render_keybinds(), keybinds_chunk);
 
-    // --- Cursor ---
-    match app.mode {
-        Mode::Input(InputField::Date) => {
-            f.set_cursor_position((
-                date_chunk.x + app.date_input.len() as u16 + 1,
-                date_chunk.y + 1,
-            ));
+    // --- Cursor Handling ---
+    if let Some((x, y)) = filter_bar::get_cursor_position(top_chunk, app) {
+        f.set_cursor_position((x, y));
+    } else if let Some(m_chunk) = middle_chunk {
+        if let Some((x, y)) = overlay_bar::get_cursor_position(m_chunk, app) {
+            f.set_cursor_position((x, y));
         }
-        Mode::Input(InputField::Search) => {
-             f.set_cursor_position((
-                search_chunk.x + app.search_input.len() as u16 + 1,
-                search_chunk.y + 1,
-            ));
-        }
-        Mode::Tagging => {
-             f.set_cursor_position((
-                tags_chunk.x + app.tags_input.len() as u16 + 1,
-                tags_chunk.y + 1,
-            ));
-        }
-        Mode::Notes => {
-             f.set_cursor_position((
-                notes_chunk.x + app.notes_input.len() as u16 + 1,
-                notes_chunk.y + 1,
-            ));
-        }
-        Mode::Creation(CreationField::Duration) => {
-            if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-                    .split(m_chunk);
-                 f.set_cursor_position((
-                    creation_chunks[1].x + app.creation_duration.len() as u16 + 1,
-                    creation_chunks[1].y + 1,
-                ));
-            }
-        }
-        Mode::Creation(CreationField::Description) => {
-            if let Some(m_chunk) = middle_chunk {
-                 let creation_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-                    .split(m_chunk);
-                f.set_cursor_position((
-                    creation_chunks[0].x + app.creation_description.len() as u16 + 1,
-                    creation_chunks[0].y + 1,
-                ));
-            }
-        }
-        _ => {}
+    } else if let Some((x, y)) = info_pane::get_cursor_position(right_pane_area, app) {
+        f.set_cursor_position((x, y));
     }
 }

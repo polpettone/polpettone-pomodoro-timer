@@ -75,7 +75,17 @@ pub fn handle_key_event(
             KeyCode::Tab => {
                 app.mode = Mode::Input(InputField::Search);
             }
+            KeyCode::Char('G') => app.to_bottom(),
+            KeyCode::Char('g') => app.mode = Mode::PendingG,
             _ => {}
+        },
+        Mode::PendingG => match key.code {
+            KeyCode::Char('g') => {
+                app.to_top();
+                app.mode = Mode::Navigation;
+            },
+            KeyCode::Esc => app.mode = Mode::Navigation,
+            _ => app.mode = Mode::Navigation,
         },
         Mode::Input(field) => match key.code {
             KeyCode::Char(c) => {

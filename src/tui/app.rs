@@ -47,6 +47,7 @@ pub enum Mode {
     Rating(RatingField),
     FastFilter,
     Zen,
+    PendingG,
 }
 
 pub struct App {
@@ -136,6 +137,18 @@ impl App {
             None => 0,
         };
         self.list_state.select(Some(i));
+    }
+
+    pub fn to_top(&mut self) {
+        if !self.filtered_sessions.is_empty() {
+            self.list_state.select(Some(0));
+        }
+    }
+
+    pub fn to_bottom(&mut self) {
+        if !self.filtered_sessions.is_empty() {
+            self.list_state.select(Some(self.filtered_sessions.len() - 1));
+        }
     }
 
     pub fn filter_sessions(&mut self) {

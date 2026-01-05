@@ -61,6 +61,7 @@ pub fn handle_key_event(
                 app.mode = Mode::Creation(CreationField::Description);
             }
             KeyCode::Char('c') => app.cancel_session()?,
+            KeyCode::Char('s') => app.duplicate_and_start_session()?,
             KeyCode::Char('x') => {
                 if app.list_state.selected().is_some() {
                     app.mode = Mode::DeleteConfirm;

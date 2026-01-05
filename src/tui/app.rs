@@ -311,6 +311,29 @@ impl App {
         Ok(())
     }
 
+    pub fn duplicate_and_start_session(&mut self) -> Result<(), Box<dyn Error>> {
+        if let Some(selected_idx) = self.list_state.selected() {
+            if let Some(selected_session) = self.filtered_sessions.get(selected_idx) {
+                let start = Utc::now();
+                let new_session = Session {
+                    description: selected_session.description.clone(),
+                    duration: selected_session.duration,
+                    start,
+                    tags: selected_session.tags.clone(),
+                    notes: selected_session.notes.clone(),
+                    state: SessionState::Running,
+                    ratings: selected_session.ratings.clone(),
+                };
+
+                serialize_session(&new_session, &self.session_dir, start)?;
+                self.sessions.push(new_session);
+                self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
+                self.filter_sessions();
+            }
+        }
+        Ok(())
+    }
+
     pub fn handle_edit_session(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,

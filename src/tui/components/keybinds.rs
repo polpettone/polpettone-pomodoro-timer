@@ -4,7 +4,7 @@ use ratatui::{
 };
 
 const KEYBINDS_TEXT: &str =
-    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | z: zen | q: quit | Esc: back";
+    "j/k: up/down | /: search | i: date filter | t: tags | n: notes | s: duplicated & start selected | r: rate | a: create | e: edit | c: cancel | x: delete | f: fast filter | z: zen | q: quit | Esc: back";
 
 const FAST_FILTER_TEXT: &str = "t: Today | w: Last Week | c: Clear Filter | Esc: Cancel";
 

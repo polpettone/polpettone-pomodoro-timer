@@ -34,6 +34,7 @@ pub enum RatingField {
     MentalEnergy,
     PhysicalEnergy,
     CognitiveLoad,
+    Motivation,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -64,6 +65,7 @@ pub struct App {
     pub rating_mental: u8,
     pub rating_physical: u8,
     pub rating_cognitive: u8,
+    pub rating_motivation: u8,
 
     pub mode: Mode,
     pub list_state: ListState,
@@ -97,6 +99,7 @@ impl App {
             rating_mental: 0,
             rating_physical: 0,
             rating_cognitive: 0,
+            rating_motivation: 0,
             mode: Mode::Navigation,
             list_state: ListState::default(),
             session_dir,
@@ -260,6 +263,7 @@ impl App {
                     mental_energy: self.rating_mental,
                     physical_energy: self.rating_physical,
                     cognitive_load: self.rating_cognitive,
+                    motivation: self.rating_motivation,
                 };
                 selected_session.ratings = Some(ratings.clone());
 

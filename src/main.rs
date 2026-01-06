@@ -288,6 +288,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         mental_energy: rng.random_range(1..=5),
                         physical_energy: rng.random_range(1..=5),
                         cognitive_load: rng.random_range(1..=5),
+                        motivation: rng.random_range(1..=5),
                     })
                 } else {
                     None

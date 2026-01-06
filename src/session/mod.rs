@@ -26,6 +26,8 @@ pub struct SessionRatings {
     pub mental_energy: u8,
     pub physical_energy: u8,
     pub cognitive_load: u8,
+    #[serde(default)]
+    pub motivation: u8,
 }
 
 fn default_state() -> SessionState {

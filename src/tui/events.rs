@@ -173,14 +173,16 @@ pub fn handle_key_event(
                 app.mode = match field {
                     RatingField::MentalEnergy => Mode::Rating(RatingField::PhysicalEnergy),
                     RatingField::PhysicalEnergy => Mode::Rating(RatingField::CognitiveLoad),
-                    RatingField::CognitiveLoad => Mode::Rating(RatingField::MentalEnergy),
+                    RatingField::CognitiveLoad => Mode::Rating(RatingField::Motivation),
+                    RatingField::Motivation => Mode::Rating(RatingField::MentalEnergy),
                 }
             },
             KeyCode::Char('k') | KeyCode::Up => {
                 app.mode = match field {
-                    RatingField::MentalEnergy => Mode::Rating(RatingField::CognitiveLoad),
+                    RatingField::MentalEnergy => Mode::Rating(RatingField::Motivation),
                     RatingField::PhysicalEnergy => Mode::Rating(RatingField::MentalEnergy),
                     RatingField::CognitiveLoad => Mode::Rating(RatingField::PhysicalEnergy),
+                    RatingField::Motivation => Mode::Rating(RatingField::CognitiveLoad),
                 }
             },
             KeyCode::Char('l') | KeyCode::Right => {
@@ -188,6 +190,7 @@ pub fn handle_key_event(
                     RatingField::MentalEnergy => app.rating_mental = (app.rating_mental + 1).min(5),
                     RatingField::PhysicalEnergy => app.rating_physical = (app.rating_physical + 1).min(5),
                     RatingField::CognitiveLoad => app.rating_cognitive = (app.rating_cognitive + 1).min(5),
+                    RatingField::Motivation => app.rating_motivation = (app.rating_motivation + 1).min(5),
                 }
             },
             KeyCode::Char('h') | KeyCode::Left => {
@@ -195,6 +198,7 @@ pub fn handle_key_event(
                     RatingField::MentalEnergy => app.rating_mental = app.rating_mental.saturating_sub(1),
                     RatingField::PhysicalEnergy => app.rating_physical = app.rating_physical.saturating_sub(1),
                     RatingField::CognitiveLoad => app.rating_cognitive = app.rating_cognitive.saturating_sub(1),
+                    RatingField::Motivation => app.rating_motivation = app.rating_motivation.saturating_sub(1),
                 }
             },
             KeyCode::Enter => {

@@ -12,7 +12,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(5), 
+                Constraint::Length(6), // Increased for extra rating
                 Constraint::Percentage(40), 
                 Constraint::Min(5),    
             ]
@@ -25,18 +25,18 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let notes_chunk = right_chunks[2];
 
     // --- Ratings Pane ---
-    let (ratings_mental, ratings_physical, ratings_cognitive) = if let Mode::Rating(_) = app.mode {
-        (app.rating_mental, app.rating_physical, app.rating_cognitive)
+    let (ratings_mental, ratings_physical, ratings_cognitive, ratings_motivation) = if let Mode::Rating(_) = app.mode {
+        (app.rating_mental, app.rating_physical, app.rating_cognitive, app.rating_motivation)
     } else {
         if let Some(idx) = app.list_state.selected() {
             if let Some(session) = app.filtered_sessions.get(idx) {
                 if let Some(r) = &session.ratings {
-                    (r.mental_energy, r.physical_energy, r.cognitive_load)
+                    (r.mental_energy, r.physical_energy, r.cognitive_load, r.motivation)
                 } else {
-                    (0,0,0)
+                    (0,0,0,0)
                 }
-            } else { (0,0,0) }
-        } else { (0,0,0) }
+            } else { (0,0,0,0) }
+        } else { (0,0,0,0) }
     };
 
     let ratings_title = if let Mode::Rating(_) = app.mode { "Ratings (Active)" } else { "Ratings" };
@@ -57,10 +57,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, *field == RatingField::MentalEnergy)));
         lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, *field == RatingField::PhysicalEnergy)));
         lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, *field == RatingField::CognitiveLoad)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Motivation", ratings_motivation, *field == RatingField::Motivation)));
     } else {
         lines.push(ratatui::text::Line::from(format_rating_line("Mental Energy", ratings_mental, false)));
         lines.push(ratatui::text::Line::from(format_rating_line("Physical Energy", ratings_physical, false)));
         lines.push(ratatui::text::Line::from(format_rating_line("Cognitive Load", ratings_cognitive, false)));
+        lines.push(ratatui::text::Line::from(format_rating_line("Motivation", ratings_motivation, false)));
     }
 
     let ratings_widget = Paragraph::new(lines)
@@ -119,7 +121,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 pub fn get_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(5), Constraint::Percentage(40), Constraint::Min(5)].as_ref())
+        .constraints([Constraint::Length(6), Constraint::Percentage(40), Constraint::Min(5)].as_ref())
         .split(area);
     
     match app.mode {

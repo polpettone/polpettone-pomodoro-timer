@@ -7,11 +7,13 @@ mod session;
 mod tui;
 
 use crate::config::Config;
-use crate::session::{Session, SessionService, SessionRatings, SessionState, serialize_session};
+use crate::session::{serialize_session, Session, SessionRatings, SessionService, SessionState};
 
+use chrono::{Duration as ChronoDuration, Utc};
 use command::Command;
 use dirs::home_dir;
 use home;
+use rand::Rng;
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
@@ -20,8 +22,6 @@ use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
 use tui::app::App;
-use rand::Rng;
-use chrono::{Utc, Duration as ChronoDuration};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -245,27 +245,38 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 Err(err) => println!("Error finding sessions: {}", err),
             }
-        },
+        }
         Command::GenerateTestData { number } => {
             let test_data_dir = "test-data";
             if !std::path::Path::new(test_data_dir).exists() {
                 fs::create_dir_all(test_data_dir)?;
             }
-            println!("Generating {} test sessions in {}...", number, test_data_dir);
+            println!(
+                "Generating {} test sessions in {}...",
+                number, test_data_dir
+            );
             let mut rng = rand::rng();
             let now = Utc::now();
 
             let descriptions = vec![
-                "Implement feature X", "Fix bug Y", "Code review", "Planning meeting",
-                "Refactoring", "Documentation", "Learning Rust", "Setup environment"
+                "Implement feature X",
+                "Fix bug Y",
+                "Code review",
+                "Planning meeting",
+                "Refactoring",
+                "Documentation",
+                "Learning Rust",
+                "Setup environment",
             ];
-            let tags_pool = vec!["work", "personal", "urgent", "learning", "rust", "tui", "fun"];
+            let tags_pool = vec![
+                "work", "personal", "urgent", "learning", "rust", "tui", "fun",
+            ];
 
             for _ in 0..number {
                 let days_ago = rng.random_range(0..30);
                 let hours_ago = rng.random_range(0..24);
                 let minutes_ago = rng.random_range(0..60);
-                let duration_minutes = 25; 
+                let duration_minutes = 25;
 
                 let start_time = now
                     - ChronoDuration::days(days_ago)
@@ -273,7 +284,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     - ChronoDuration::minutes(minutes_ago);
 
                 let desc = descriptions[rng.random_range(0..descriptions.len())].to_string();
-                
+
                 let num_tags = rng.random_range(0..4);
                 let mut session_tags = Vec::new();
                 for _ in 0..num_tags {
@@ -299,7 +310,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     duration: Duration::from_secs(duration_minutes * 60),
                     start: start_time,
                     tags: session_tags,
-                    notes: if rng.random_bool(0.3) { "Generated test note.".to_string() } else { String::new() },
+                    notes: if rng.random_bool(0.3) {
+                        "Generated test note.".to_string()
+                    } else {
+                        String::new()
+                    },
                     state: SessionState::Done,
                     ratings,
                 };
@@ -312,3 +327,4 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+

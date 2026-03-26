@@ -1,8 +1,8 @@
+use chrono::Utc;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::error::Error;
 use std::io::Stdout;
-use chrono::{Utc};
 
 use super::app::{App, CreationField, InputField, Mode, RatingField};
 
@@ -25,7 +25,7 @@ pub fn handle_key_event(
                         app.mode = Mode::Tagging;
                     }
                 }
-            },
+            }
             KeyCode::Char('n') => {
                 if let Some(idx) = app.list_state.selected() {
                     if let Some(session) = app.filtered_sessions.get(idx) {
@@ -33,7 +33,7 @@ pub fn handle_key_event(
                         app.mode = Mode::Notes;
                     }
                 }
-            },
+            }
             KeyCode::Char('r') => {
                 if let Some(idx) = app.list_state.selected() {
                     if let Some(session) = app.filtered_sessions.get(idx) {
@@ -66,13 +66,13 @@ pub fn handle_key_event(
                 if app.list_state.selected().is_some() {
                     app.mode = Mode::DeleteConfirm;
                 }
-            },
+            }
             KeyCode::Char('f') => {
                 app.mode = Mode::FastFilter;
-            },
+            }
             KeyCode::Char('z') => {
                 app.mode = Mode::Zen;
-            },
+            }
             KeyCode::Tab => {
                 app.mode = Mode::Input(InputField::Search);
             }
@@ -84,7 +84,7 @@ pub fn handle_key_event(
             KeyCode::Char('g') => {
                 app.to_top();
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Esc => app.mode = Mode::Navigation,
             _ => app.mode = Mode::Navigation,
         },
@@ -98,12 +98,17 @@ pub fn handle_key_event(
             }
             KeyCode::Backspace => {
                 match field {
-                    InputField::Date => { app.date_input.pop(); }
-                    InputField::Search => { app.search_input.pop(); }
+                    InputField::Date => {
+                        app.date_input.pop();
+                    }
+                    InputField::Search => {
+                        app.search_input.pop();
+                    }
                 }
                 app.filter_sessions();
             }
             KeyCode::Esc => app.mode = Mode::Navigation,
+            KeyCode::Enter => app.mode = Mode::Navigation,
             KeyCode::Tab => {
                 app.mode = match field {
                     InputField::Date => Mode::Input(InputField::Search),
@@ -128,33 +133,37 @@ pub fn handle_key_event(
             KeyCode::Char(c) => app.notes_input.push(c),
             KeyCode::Backspace => {
                 app.notes_input.pop();
-            },
+            }
             KeyCode::Enter => {
                 app.save_notes()?;
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Esc => app.mode = Mode::Navigation,
             _ => {}
         },
         Mode::Creation(field) => match key.code {
-             KeyCode::Char(c) => match field {
+            KeyCode::Char(c) => match field {
                 CreationField::Duration => app.creation_duration.push(c),
                 CreationField::Description => app.creation_description.push(c),
             },
             KeyCode::Backspace => match field {
-                CreationField::Duration => { app.creation_duration.pop(); }
-                CreationField::Description => { app.creation_description.pop(); }
+                CreationField::Duration => {
+                    app.creation_duration.pop();
+                }
+                CreationField::Description => {
+                    app.creation_description.pop();
+                }
             },
             KeyCode::Tab => {
                 app.mode = match field {
                     CreationField::Duration => Mode::Creation(CreationField::Description),
                     CreationField::Description => Mode::Creation(CreationField::Duration),
                 }
-            },
+            }
             KeyCode::Enter => {
                 app.create_session()?;
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Esc => app.mode = Mode::Navigation,
             _ => {}
         },
@@ -162,10 +171,10 @@ pub fn handle_key_event(
             KeyCode::Char('y') | KeyCode::Enter => {
                 app.delete_session()?;
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Char('n') | KeyCode::Esc => {
                 app.mode = Mode::Navigation;
-            },
+            }
             _ => {}
         },
         Mode::Rating(field) => match key.code {
@@ -176,7 +185,7 @@ pub fn handle_key_event(
                     RatingField::CognitiveLoad => Mode::Rating(RatingField::Motivation),
                     RatingField::Motivation => Mode::Rating(RatingField::MentalEnergy),
                 }
-            },
+            }
             KeyCode::Char('k') | KeyCode::Up => {
                 app.mode = match field {
                     RatingField::MentalEnergy => Mode::Rating(RatingField::Motivation),
@@ -184,27 +193,37 @@ pub fn handle_key_event(
                     RatingField::CognitiveLoad => Mode::Rating(RatingField::PhysicalEnergy),
                     RatingField::Motivation => Mode::Rating(RatingField::CognitiveLoad),
                 }
-            },
-            KeyCode::Char('l') | KeyCode::Right => {
-                match field {
-                    RatingField::MentalEnergy => app.rating_mental = (app.rating_mental + 1).min(5),
-                    RatingField::PhysicalEnergy => app.rating_physical = (app.rating_physical + 1).min(5),
-                    RatingField::CognitiveLoad => app.rating_cognitive = (app.rating_cognitive + 1).min(5),
-                    RatingField::Motivation => app.rating_motivation = (app.rating_motivation + 1).min(5),
+            }
+            KeyCode::Char('l') | KeyCode::Right => match field {
+                RatingField::MentalEnergy => app.rating_mental = (app.rating_mental + 1).min(5),
+                RatingField::PhysicalEnergy => {
+                    app.rating_physical = (app.rating_physical + 1).min(5)
+                }
+                RatingField::CognitiveLoad => {
+                    app.rating_cognitive = (app.rating_cognitive + 1).min(5)
+                }
+                RatingField::Motivation => {
+                    app.rating_motivation = (app.rating_motivation + 1).min(5)
                 }
             },
-            KeyCode::Char('h') | KeyCode::Left => {
-                match field {
-                    RatingField::MentalEnergy => app.rating_mental = app.rating_mental.saturating_sub(1),
-                    RatingField::PhysicalEnergy => app.rating_physical = app.rating_physical.saturating_sub(1),
-                    RatingField::CognitiveLoad => app.rating_cognitive = app.rating_cognitive.saturating_sub(1),
-                    RatingField::Motivation => app.rating_motivation = app.rating_motivation.saturating_sub(1),
+            KeyCode::Char('h') | KeyCode::Left => match field {
+                RatingField::MentalEnergy => {
+                    app.rating_mental = app.rating_mental.saturating_sub(1)
+                }
+                RatingField::PhysicalEnergy => {
+                    app.rating_physical = app.rating_physical.saturating_sub(1)
+                }
+                RatingField::CognitiveLoad => {
+                    app.rating_cognitive = app.rating_cognitive.saturating_sub(1)
+                }
+                RatingField::Motivation => {
+                    app.rating_motivation = app.rating_motivation.saturating_sub(1)
                 }
             },
             KeyCode::Enter => {
                 app.save_ratings()?;
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Esc => app.mode = Mode::Navigation,
             _ => {}
         },
@@ -214,19 +233,23 @@ pub fn handle_key_event(
                 app.date_input = today.format("%Y-%m-%d").to_string();
                 app.filter_sessions();
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Char('w') => {
                 let today = Utc::now().date_naive();
                 let week_ago = today - chrono::Duration::days(7);
-                app.date_input = format!("{} - {}", week_ago.format("%Y-%m-%d"), today.format("%Y-%m-%d"));
+                app.date_input = format!(
+                    "{} - {}",
+                    week_ago.format("%Y-%m-%d"),
+                    today.format("%Y-%m-%d")
+                );
                 app.filter_sessions();
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Char('c') => {
                 app.date_input = String::new();
                 app.filter_sessions();
                 app.mode = Mode::Navigation;
-            },
+            }
             KeyCode::Esc => app.mode = Mode::Navigation,
             _ => {}
         },
@@ -234,7 +257,7 @@ pub fn handle_key_event(
             KeyCode::Char('z') | KeyCode::Esc => app.mode = Mode::Navigation,
             KeyCode::Char('q') => return Ok(false),
             _ => {}
-        }
+        },
     }
     Ok(true)
 }

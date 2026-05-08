@@ -3,7 +3,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::tui::app::{App, InputField, Mode};
+use crate::adapters::tui::app::{App, InputField, Mode};
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let top_chunks = Layout::default()

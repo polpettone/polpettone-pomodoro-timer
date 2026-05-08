@@ -4,8 +4,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::tui::app::{App, Mode, RatingField};
-use crate::tui::components::ratings;
+use crate::adapters::tui::app::{App, Mode, RatingField};
+use crate::adapters::tui::components::ratings;
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let right_chunks = Layout::default()

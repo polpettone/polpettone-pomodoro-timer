@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::tui::app::{App, Mode, CreationField};
+use crate::adapters::tui::app::{App, Mode, CreationField};
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     if let Mode::Creation(ref field) = app.mode {

@@ -1,4 +1,4 @@
-use crate::session::Session;
+use crate::domain::session::Session;
 use chrono::Duration as ChronoDuration;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table};
 use std::error::Error;

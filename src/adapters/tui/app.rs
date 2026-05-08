@@ -13,9 +13,11 @@ use ratatui::{
 };
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
-use crate::session::{serialize_session, Session, SessionRatings, SessionState};
-use crate::tui::components::{filter_bar, info_pane, keybinds, overlay_bar, session_list, zen};
-use crate::tui::events;
+use crate::domain::session::{Session, SessionRatings, SessionState};
+use crate::adapters::tui::components::{filter_bar, info_pane, keybinds, overlay_bar, session_list, zen};
+use crate::adapters::tui::events;
+use crate::domain::repository::SessionRepository;
+use crate::adapters::persistence::file_repository::FileSessionRepository;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -82,7 +84,8 @@ impl App {
                 let remaining = session.remaining_duration();
                 if remaining.as_secs() == 0 {
                     session.state = SessionState::Done;
-                    let _ = serialize_session(session, &session_dir, session.start);
+                    let repo = FileSessionRepository::new(session_dir.clone());
+                    let _ = repo.save(session);
                 }
             }
         }
@@ -230,7 +233,7 @@ impl App {
                     original_session.tags = new_tags;
                 }
 
-                serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
             }
         }
         Ok(())
@@ -250,7 +253,7 @@ impl App {
                     original_session.notes = new_notes;
                 }
 
-                serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
             }
         }
         Ok(())
@@ -275,7 +278,7 @@ impl App {
                     original_session.ratings = Some(ratings);
                 }
 
-                serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
             }
         }
         Ok(())
@@ -291,7 +294,7 @@ impl App {
                          original_session.state = SessionState::Canceled;
                      }
                      
-                     serialize_session(selected_session, &self.session_dir, selected_session.start)?;
+                     FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
                 }
             }
          }
@@ -308,7 +311,7 @@ impl App {
                     original_session.state = SessionState::Deleted;
                 }
 
-                serialize_session(&deleted_session, &self.session_dir, deleted_session.start)?;
+                FileSessionRepository::new(self.session_dir.clone()).save(&deleted_session)?;
                 self.filter_sessions();
             }
         }
@@ -329,7 +332,7 @@ impl App {
                     ratings: selected_session.ratings.clone(),
                 };
 
-                serialize_session(&new_session, &self.session_dir, start)?;
+                FileSessionRepository::new(self.session_dir.clone()).save(&new_session)?;
                 self.sessions.push(new_session);
                 self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
                 self.filter_sessions();
@@ -382,11 +385,7 @@ impl App {
                         }
                         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
-                        serialize_session(
-                            &edited_session,
-                            &self.session_dir,
-                            edited_session.start,
-                        )?;
+                        FileSessionRepository::new(self.session_dir.clone()).save(&edited_session)?;
 
                         self.filter_sessions();
                     }
@@ -412,7 +411,7 @@ impl App {
             ratings: None,
         };
         
-        serialize_session(&session, &self.session_dir, start)?;
+        FileSessionRepository::new(self.session_dir.clone()).save(&session)?;
         
         self.sessions.push(session);
         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
@@ -433,7 +432,8 @@ impl App {
             for session in self.sessions.iter_mut() {
                 if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
                     session.state = SessionState::Done;
-                    let _ = serialize_session(session, &self.session_dir, session.start);
+                    let repo = FileSessionRepository::new(self.session_dir.clone());
+                    let _ = repo.save(session);
                     changed = true;
                 }
             }

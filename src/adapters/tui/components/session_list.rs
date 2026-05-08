@@ -1,5 +1,5 @@
-use crate::session::SessionState;
-use crate::tui::app::App;
+use crate::domain::session::SessionState;
+use crate::adapters::tui::app::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

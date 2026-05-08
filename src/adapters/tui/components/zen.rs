@@ -5,8 +5,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::session::Session;
-use crate::tui::components::ascii_digits;
+use crate::domain::session::Session;
+use crate::adapters::tui::components::ascii_digits;
 
 pub fn render(f: &mut Frame, session: Option<&Session>) {
     let area = f.area();

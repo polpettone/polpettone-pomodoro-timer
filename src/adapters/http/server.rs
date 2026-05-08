@@ -5,7 +5,7 @@ use axum::{
 };
 use crate::application::service::SessionService;
 use crate::domain::repository::SessionRepository;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use std::net::SocketAddr;
 use chrono::{Utc, NaiveDateTime};
@@ -26,8 +26,8 @@ pub struct StartSessionRequest {
 
 #[derive(Deserialize)]
 pub struct FindSessionsRequest {
-    pub start: String,
-    pub end: String,
+    pub start: Option<String>,
+    pub end: Option<String>,
     pub query: Option<String>,
 }
 
@@ -78,12 +78,22 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     Query(params): Query<FindSessionsRequest>,
 ) -> Result<Json<Vec<Session>>, String> {
-    let start = NaiveDateTime::parse_from_str(&params.start, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| dt.and_utc())
-        .map_err(|_| "Invalid start date. Use YYYY-MM-DD HH:MM:SS".to_string())?;
-    let end = NaiveDateTime::parse_from_str(&params.end, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| dt.and_utc())
-        .map_err(|_| "Invalid end date. Use YYYY-MM-DD HH:MM:SS".to_string())?;
+    let now = Utc::now();
+    let start = if let Some(s) = params.start {
+        NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
+            .map(|dt| dt.and_utc())
+            .map_err(|_| "Invalid start date. Use YYYY-MM-DD HH:MM:SS".to_string())?
+    } else {
+        now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc()
+    };
+
+    let end = if let Some(e) = params.end {
+        NaiveDateTime::parse_from_str(&e, "%Y-%m-%d %H:%M:%S")
+            .map(|dt| dt.and_utc())
+            .map_err(|_| "Invalid end date. Use YYYY-MM-DD HH:MM:SS".to_string())?
+    } else {
+        now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc()
+    };
 
     let sessions = state.service.find_sessions_in_range(start, end, params.query)
         .map_err(|e| e.to_string())?;

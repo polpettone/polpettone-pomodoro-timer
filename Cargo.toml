@@ -3,6 +3,12 @@ name = "polpettone-pomodoro-timer"
 version = "0.3.1"
 edition = "2021"
 
+[workspace]
+members = [
+    ".",
+    "frontend",
+]
+
 
 [dependencies]
 structopt = "0.3.26"

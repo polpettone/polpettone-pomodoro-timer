@@ -3,6 +3,7 @@ use axum::{
     extract::{State, Query},
     Json, Router,
 };
+use tower_http::cors::{Any, CorsLayer};
 use crate::application::service::SessionService;
 use crate::domain::repository::SessionRepository;
 use serde::Deserialize;
@@ -41,12 +42,18 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState { service });
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/sessions/start", post(start_session::<R>))
         .route("/sessions/active", get(get_active_sessions::<R>))
         .route("/sessions", get(get_sessions::<R>))
         .route("/sessions/init", post(init_session_dir::<R>))
         .route("/sessions/generate", post(generate_test_data::<R>))
+        .layer(cors)
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

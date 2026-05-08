@@ -66,3 +66,12 @@ li {
 }
 .status-msg { margin-top: 1rem; text-align: center; font-weight: bold; }
 .refresh-btn { margin-bottom: 1rem; }
+.timer-display {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    color: var(--accent-color);
+    background: rgba(255, 82, 82, 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}

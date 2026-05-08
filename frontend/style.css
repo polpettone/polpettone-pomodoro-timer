@@ -65,7 +65,6 @@ li {
     border-radius: 6px;
 }
 .status-msg { margin-top: 1rem; text-align: center; font-weight: bold; }
-.refresh-btn { margin-bottom: 1rem; }
 .timer-display {
     font-family: 'Courier New', Courier, monospace;
     font-weight: bold;

@@ -59,11 +59,6 @@ fn ActiveSessions(sessions: Resource<(), Result<Vec<Session>, String>>) -> impl 
     view! {
         <div>
             <h2>"Aktive Sitzungen"</h2>
-            <div class="flex justify-center refresh-btn">
-                <button on:click=move |_| sessions.refetch()>
-                    "↻ Aktualisieren"
-                </button>
-            </div>
             <Transition fallback=move || view! { <p class="status-msg">"Lade..."</p> }>
                 {move || {
                     sessions.get().map(|res| match res {
@@ -168,6 +163,11 @@ fn StartSession(#[prop(into)] on_success: Callback<()>) -> impl IntoView {
                     type="text" 
                     placeholder="Beschreibung"
                     on:input=move |ev| set_description.set(event_target_value(&ev))
+                    on:keydown=move |ev| {
+                        if ev.key() == "Enter" {
+                            start_action.dispatch((description.get(), duration.get()));
+                        }
+                    }
                     prop:value=description
                 />
                 <input 

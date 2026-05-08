@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct FileSessionRepository {
     session_dir: String,
 }

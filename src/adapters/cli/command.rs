@@ -37,4 +37,5 @@ pub enum Command {
         #[structopt(short = "n", long = "number", default_value = "50")]
         number: u32,
     },
+    Server,
 }

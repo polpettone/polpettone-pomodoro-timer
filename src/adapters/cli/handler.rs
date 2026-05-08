@@ -9,8 +9,9 @@ use std::thread;
 use std::time::Duration;
 use crate::domain::session::{Session, SessionState};
 use rand::Rng;
+use crate::adapters::http::server;
 
-pub fn handle_command<R: SessionRepository>(
+pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
     cmd: Command,
     session_service: &SessionService<R>,
 ) -> Result<(), Box<dyn Error>> {
@@ -46,7 +47,17 @@ pub fn handle_command<R: SessionRepository>(
         Command::GenerateTestData { number } => {
             handle_generate_test_data(session_service, number)?;
         }
+        Command::Server => {
+            handle_server(session_service).await?;
+        }
     }
+    Ok(())
+}
+
+async fn handle_server<R: SessionRepository + Send + Sync + 'static + Clone>(
+    session_service: &SessionService<R>
+) -> Result<(), Box<dyn Error>> {
+    server::run_server(session_service.clone()).await?;
     Ok(())
 }
 

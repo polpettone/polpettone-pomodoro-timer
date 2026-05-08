@@ -2,7 +2,6 @@ mod adapters;
 mod application;
 mod config;
 mod date_time;
-mod display;
 mod domain;
 
 use crate::config::Config;

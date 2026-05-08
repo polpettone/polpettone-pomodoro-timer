@@ -1,7 +1,7 @@
 use crate::application::service::SessionService;
 use crate::domain::repository::SessionRepository;
 use crate::adapters::cli::command::Command;
-use crate::display;
+use crate::adapters::cli::display;
 use crate::adapters::tui::app::App;
 use chrono::{Duration as ChronoDuration, Utc, NaiveDateTime};
 use std::error::Error;

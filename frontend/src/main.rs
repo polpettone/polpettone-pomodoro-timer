@@ -24,13 +24,12 @@ fn main() {
 #[component]
 fn App() -> impl IntoView {
     view! {
-        <main>
+        <main class="container">
             <h1>"Polpettone Pomodoro Timer"</h1>
-            <section>
+            <section class="card">
                 <StartSession />
             </section>
-            <hr />
-            <section>
+            <section class="card">
                 <ActiveSessions />
             </section>
         </main>
@@ -59,15 +58,17 @@ fn ActiveSessions() -> impl IntoView {
     view! {
         <div>
             <h2>"Aktive Sitzungen"</h2>
-            <button on:click=move |_| sessions.refetch()>
-                "↻ Aktualisieren"
-            </button>
-            <Transition fallback=move || view! { <p>"Lade..."</p> }>
+            <div class="flex justify-center refresh-btn">
+                <button on:click=move |_| sessions.refetch()>
+                    "↻ Aktualisieren"
+                </button>
+            </div>
+            <Transition fallback=move || view! { <p class="status-msg">"Lade..."</p> }>
                 {move || {
                     sessions.get().map(|res| match res {
                         Ok(data) => {
                             if data.is_empty() {
-                                view! { <p>"Keine aktiven Sitzungen vorhanden."</p> }.into_view()
+                                view! { <p class="status-msg">"Keine aktiven Sitzungen vorhanden."</p> }.into_view()
                             } else {
                                 view! {
                                     <ul>
@@ -83,7 +84,7 @@ fn ActiveSessions() -> impl IntoView {
                                 }.into_view()
                             }
                         },
-                        Err(e) => view! { <p style="color: red">{e}</p> }.into_view(),
+                        Err(e) => view! { <p class="status-msg" style="color: var(--accent-color)">{e}</p> }.into_view(),
                     })
                 }}
             </Transition>
@@ -118,7 +119,7 @@ fn StartSession() -> impl IntoView {
     view! {
         <div>
             <h2>"Neue Sitzung starten"</h2>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="flex justify-center items-center">
                 <input 
                     type="text" 
                     placeholder="Beschreibung"
@@ -127,6 +128,7 @@ fn StartSession() -> impl IntoView {
                 />
                 <input 
                     type="number" 
+                    style="width: 80px"
                     on:input=move |ev| set_duration.set(event_target_value(&ev).parse().unwrap_or(25))
                     prop:value=duration
                 />
@@ -140,11 +142,11 @@ fn StartSession() -> impl IntoView {
             {move || {
                 if let Some(res) = start_action.value().get() {
                     match res {
-                        Ok(_) => view! { <p style="color: green">"Sitzung gestartet!"</p> }.into_view(),
-                        Err(e) => view! { <p style="color: red">{e}</p> }.into_view(),
+                        Ok(_) => view! { <p class="status-msg" style="color: #4caf50">"Sitzung gestartet!"</p> }.into_view(),
+                        Err(e) => view! { <p class="status-msg" style="color: var(--accent-color)">{e}</p> }.into_view(),
                     }
                 } else {
-                    view! { <span /> }.into_view()
+                    view! { <div class="status-msg" /> }.into_view()
                 }
             }}
         </div>

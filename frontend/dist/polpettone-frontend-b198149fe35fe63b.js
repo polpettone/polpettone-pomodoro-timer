@@ -218,16 +218,16 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a(arg0, arg1, arg2) {
-    wasm.wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a(arg0, arg1, arg2);
-}
-
 function wasm_bindgen__convert__closures_____invoke__h865a7b30358d1823(arg0, arg1, arg2) {
     wasm.wasm_bindgen__convert__closures_____invoke__h865a7b30358d1823(arg0, arg1, arg2);
 }
 
 function wasm_bindgen__convert__closures_____invoke__h48f4c6a65cffb812(arg0, arg1, arg2) {
     wasm.wasm_bindgen__convert__closures_____invoke__h48f4c6a65cffb812(arg0, arg1, arg2);
+}
+
+function wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a(arg0, arg1, arg2);
 }
 
 function wasm_bindgen__convert__closures_____invoke__h225da65d602f2686(arg0, arg1) {
@@ -907,14 +907,9 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(arg0);
     };
-    imports.wbg.__wbindgen_cast_0af376337079972d = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 330, function: Function { arguments: [NamedExternref("Event")], shim_idx: 336, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h353c1fc168cdce9e, wasm_bindgen__convert__closures_____invoke__h865a7b30358d1823);
-        return ret;
-    };
-    imports.wbg.__wbindgen_cast_33367f7c7b34ce9f = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 331, function: Function { arguments: [], shim_idx: 335, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h6abe1f87e931ab5b, wasm_bindgen__convert__closures_____invoke__h225da65d602f2686);
+    imports.wbg.__wbindgen_cast_42ef79217ed4073d = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 388, function: Function { arguments: [Externref], shim_idx: 389, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h8b4ae470d959179f, wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a);
         return ret;
     };
     imports.wbg.__wbindgen_cast_4625c577ab2ec9ee = function(arg0) {
@@ -922,9 +917,14 @@ function __wbg_get_imports() {
         const ret = BigInt.asUintN(64, arg0);
         return ret;
     };
-    imports.wbg.__wbindgen_cast_50df370ff9f58742 = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 394, function: Function { arguments: [Externref], shim_idx: 395, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h8b4ae470d959179f, wasm_bindgen__convert__closures_____invoke__hf4573baa20505b5a);
+    imports.wbg.__wbindgen_cast_5bcefc5fdb9ed77c = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 324, function: Function { arguments: [NamedExternref("Event")], shim_idx: 330, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h353c1fc168cdce9e, wasm_bindgen__convert__closures_____invoke__h865a7b30358d1823);
+        return ret;
+    };
+    imports.wbg.__wbindgen_cast_7b5b37094896461d = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 325, function: Function { arguments: [], shim_idx: 329, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h6abe1f87e931ab5b, wasm_bindgen__convert__closures_____invoke__h225da65d602f2686);
         return ret;
     };
     imports.wbg.__wbindgen_cast_7e9c58eeb11b0a6f = function(arg0, arg1) {

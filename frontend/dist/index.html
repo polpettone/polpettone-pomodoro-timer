@@ -5,14 +5,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Polpettone Pomodoro Timer</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-        button { padding: 0.5rem 1rem; cursor: pointer; }
+        :root {
+            --bg-color: #1a1a1a;
+            --container-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #ff5252;
+            --accent-hover: #ff7b7b;
+            --border-color: #404040;
+            --input-bg: #3d3d3d;
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 2rem 1rem; 
+            line-height: 1.6; 
+        }
+        h1, h2 { color: var(--accent-color); text-align: center; }
+        .container {
+            background-color: var(--container-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin-bottom: 2rem;
+        }
+        .card {
+            background-color: var(--input-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--accent-color);
+        }
+        input {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            outline: none;
+        }
+        input:focus { border-color: var(--accent-color); }
+        button { 
+            padding: 0.75rem 1.5rem; 
+            cursor: pointer; 
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        button:active { transform: scale(0.98); }
+        button:disabled { background-color: var(--border-color); cursor: not-allowed; }
+        .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .justify-center { justify-content: center; }
+        .items-center { align-items: center; }
+        ul { list-style: none; padding: 0; }
+        li { 
+            margin-bottom: 0.75rem; 
+            padding: 1rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+        .status-msg { margin-top: 1rem; text-align: center; font-weight: bold; }
+        .refresh-btn { margin-bottom: 1rem; }
     </style>
-  <link rel="modulepreload" href="/polpettone-frontend-2b12728ee7ebd179.js" crossorigin="anonymous" integrity="sha384-dkAxQ5hyAiV6OxUEKu7cBPXR0cxR60gT3z6+HrtHVfGf6SdOFqyriQguYgEuw8it"><link rel="preload" href="/polpettone-frontend-2b12728ee7ebd179_bg.wasm" crossorigin="anonymous" integrity="sha384-U0qeE6Xi2Kdj5KPcNfhwOC3V+T/1pc4YPGiHJRyOXe9oMDY9gnakSwQTRrl6QQoT" as="fetch" type="application/wasm"></head>
+  <link rel="modulepreload" href="/polpettone-frontend-b198149fe35fe63b.js" crossorigin="anonymous" integrity="sha384-RCoFFzoCF/YYG58yqj93ImNlhKegZ3WYxckgTSqFxZyqCeIFplnnb1dAYjAf4OtC"><link rel="preload" href="/polpettone-frontend-b198149fe35fe63b_bg.wasm" crossorigin="anonymous" integrity="sha384-E5QKw57JJpNUOAL+AV+1BW08hu8pgbNviuR420QI4LI6e7W4dq57uenEpfeV4iDg" as="fetch" type="application/wasm"></head>
   <body>
 <script type="module">
-import init, * as bindings from '/polpettone-frontend-2b12728ee7ebd179.js';
-const wasm = await init({ module_or_path: '/polpettone-frontend-2b12728ee7ebd179_bg.wasm' });
+import init, * as bindings from '/polpettone-frontend-b198149fe35fe63b.js';
+const wasm = await init({ module_or_path: '/polpettone-frontend-b198149fe35fe63b_bg.wasm' });
 
 
 window.wasmBindings = bindings;

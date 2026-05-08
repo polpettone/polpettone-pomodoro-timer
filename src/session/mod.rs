@@ -149,6 +149,7 @@ impl SessionService {
         let active_sessions = sessions
             .into_iter()
             .filter(|session| session.start + session.duration > now)
+            .filter(|session| session.state == SessionState::Running)
             .collect();
         Ok(active_sessions)
     }

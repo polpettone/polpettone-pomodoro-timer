@@ -24,14 +24,16 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
+    let sessions = create_resource(|| (), |_| fetch_active_sessions());
+
     view! {
         <main class="container">
             <h1>"Polpettone Pomodoro Timer"</h1>
             <section class="card">
-                <StartSession />
+                <StartSession on_success=move |_| sessions.refetch() />
             </section>
             <section class="card">
-                <ActiveSessions />
+                <ActiveSessions sessions=sessions />
             </section>
         </main>
     }
@@ -53,9 +55,7 @@ async fn fetch_active_sessions() -> Result<Vec<Session>, String> {
 }
 
 #[component]
-fn ActiveSessions() -> impl IntoView {
-    let sessions = create_resource(|| (), |_| fetch_active_sessions());
-
+fn ActiveSessions(sessions: Resource<(), Result<Vec<Session>, String>>) -> impl IntoView {
     view! {
         <div>
             <h2>"Aktive Sitzungen"</h2>
@@ -130,7 +130,7 @@ fn Timer(session: Session) -> impl IntoView {
 }
 
 #[component]
-fn StartSession() -> impl IntoView {
+fn StartSession(#[prop(into)] on_success: Callback<()>) -> impl IntoView {
     let (description, set_description) = create_signal("".to_string());
     let (duration, set_duration) = create_signal(25);
 
@@ -150,6 +150,13 @@ fn StartSession() -> impl IntoView {
                 .await
                 .map_err(|e| e.to_string())?;
             Ok::<(), String>(())
+        }
+    });
+
+    create_effect(move |_| {
+        if let Some(Ok(_)) = start_action.value().get() {
+            set_description.set("".to_string());
+            on_success.call(());
         }
     });
 

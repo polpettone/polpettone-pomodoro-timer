@@ -127,7 +127,7 @@ fn Timer(session: Session) -> impl IntoView {
 #[component]
 fn StartSession(#[prop(into)] on_success: Callback<()>) -> impl IntoView {
     let (description, set_description) = create_signal("".to_string());
-    let (duration, set_duration) = create_signal(25);
+    let (duration, set_duration) = create_signal("25".to_string());
 
     let start_action = create_action(|(desc, dur): &(String, u64)| {
         let desc = desc.clone();
@@ -165,19 +165,24 @@ fn StartSession(#[prop(into)] on_success: Callback<()>) -> impl IntoView {
                     on:input=move |ev| set_description.set(event_target_value(&ev))
                     on:keydown=move |ev| {
                         if ev.key() == "Enter" {
-                            start_action.dispatch((description.get(), duration.get()));
+                            start_action.dispatch((description.get(), duration.get().parse().unwrap_or(25)));
                         }
                     }
                     prop:value=description
                 />
                 <input 
-                    type="number" 
+                    type="text" 
+                    inputmode="numeric"
                     style="width: 80px"
-                    on:input=move |ev| set_duration.set(event_target_value(&ev).parse().unwrap_or(25))
+                    on:input=move |ev| {
+                        let val = event_target_value(&ev);
+                        let filtered: String = val.chars().filter(|c| c.is_ascii_digit()).collect();
+                        set_duration.set(filtered);
+                    }
                     prop:value=duration
                 />
                 <button 
-                    on:click=move |_| start_action.dispatch((description.get(), duration.get()))
+                    on:click=move |_| start_action.dispatch((description.get(), duration.get().parse().unwrap_or(25)))
                     disabled=move || start_action.pending().get()
                 >
                     "Start"

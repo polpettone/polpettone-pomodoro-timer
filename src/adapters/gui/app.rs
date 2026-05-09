@@ -7,6 +7,11 @@ use std::error::Error;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
+use crate::adapters::gui::components::input_field;
+use crate::adapters::gui::components::session_list;
+use crate::adapters::gui::components::timer;
+use crate::adapters::gui::styles::styles::Style;
+
 enum GuiCommand {
     StartSession(String, u64),
 }
@@ -21,6 +26,7 @@ static DATA_RX: Lazy<Mutex<Option<Receiver<GuiData>>>> = Lazy::new(|| Mutex::new
 struct Model {
     sessions: Vec<Session>,
     description_input: String,
+    style: Style,
 }
 
 pub fn run<R: SessionRepository + Send + 'static>(
@@ -67,7 +73,10 @@ pub fn run<R: SessionRepository + Send + 'static>(
 
 fn model(app: &App) -> Model {
     app.new_window()
-        .size(1000, 700)
+        .size(
+            Style::new().layout.window_size.0,
+            Style::new().layout.window_size.1,
+        )
         .title("Polpettone Pomodoro")
         .event(event)
         .view(view)
@@ -77,6 +86,7 @@ fn model(app: &App) -> Model {
     Model {
         sessions: Vec::new(),
         description_input: String::new(),
+        style: Style::new(),
     }
 }
 
@@ -120,15 +130,12 @@ fn event(_app: &App, model: &mut Model, event: WindowEvent) {
 
 fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
-    draw.background().color(rgb(0.1, 0.1, 0.15)); // Dunkler Hintergrund
+    draw.background().color(model.style.colors.background);
 
     let win = app.window_rect();
 
-    // Titel mit Schatteneffekt
-    draw.text("Polpettone Pomodoro")
-        .xy(win.top_left() + vec2(150.0, -40.0))
-        .font_size(48)
-        .color(rgb(1.0, 0.5, 0.0)); // Orange
+    // Titel zeichnen
+    timer::draw_title(&draw, &model.style, win);
 
     // Aktive Sitzung oder Timer
     let active_session = model
@@ -137,158 +144,15 @@ fn view(app: &App, model: &Model, frame: Frame) {
         .find(|s| s.state == SessionState::Running && s.remaining_duration().as_secs() > 0);
 
     if let Some(s) = active_session {
-        let remaining = s.remaining_duration();
-        let mins = remaining.as_secs() / 60;
-        let secs = remaining.as_secs() % 60;
-
-        // Timer mit Hintergrund
-        draw.rect()
-            .w_h(300.0, 100.0)
-            .color(rgb(0.2, 0.2, 0.3))
-            .xy(vec2(0.0, 150.0));
-        draw.text(&format!("{:02}:{:02}", mins, secs))
-            .font_size(72)
-            .xy(vec2(0.0, 150.0))
-            .color(GREEN);
-
-        // Beschreibung
-        draw.text(&s.description)
-            .font_size(32)
-            .xy(vec2(0.0, 50.0))
-            .color(WHITE);
+        timer::draw_timer(&draw, &model.style, s);
     } else {
-        draw.text("Ready to Start")
-            .font_size(48)
-            .xy(vec2(0.0, 150.0))
-            .color(GRAY);
-
-        // Eingabefeld mit Rahmen
-        let input_y = 50.0;
-        draw.rect()
-            .xy(vec2(0.0, input_y))
-            .w_h(600.0, 50.0)
-            .color(rgb(0.15, 0.15, 0.2));
-        draw.rect()
-            .xy(vec2(0.0, input_y))
-            .w_h(600.0, 50.0)
-            .stroke_weight(2.0)
-            .color(rgb(0.4, 0.4, 0.6))
-            .stroke_color(rgb(0.4, 0.4, 0.6));
-
-        let cursor = if (app.time * 2.0) as i32 % 2 == 0 {
-            "|"
-        } else {
-            ""
-        };
-        draw.text(&format!(
-            "Description: {}{}",
-            model.description_input, cursor
-        ))
-        .font_size(24)
-        .xy(vec2(0.0, input_y))
-        .color(WHITE);
-
-        draw.text("Type and press Enter to start 25min session")
-            .font_size(18)
-            .xy(vec2(0.0, 0.0))
-            .color(GRAY);
+        input_field::draw_ready_state(&draw, &model.style, app, &model.description_input);
     }
-
-    // History Section
-    let history_top = -70.0;
-    draw.text("Recent Sessions")
-        .xy(vec2(0.0, history_top))
-        .font_size(28)
-        .color(CYAN);
-
-    // Spaltenüberschriften
-    let col_time = -400.0;
-    let col_dur = -180.0;
-    let col_desc = -100.0;
-    let col_status = 350.0;
-
-    let header_y = history_top - 40.0;
-    draw.text("Start Time")
-        .x(col_time)
-        .y(header_y)
-        .font_size(16)
-        .color(GRAY)
-        .left_justify();
-    draw.text("Dur")
-        .x(col_dur)
-        .y(header_y)
-        .font_size(16)
-        .color(GRAY)
-        .left_justify();
-    draw.text("Description")
-        .x(col_desc)
-        .y(header_y)
-        .font_size(16)
-        .color(GRAY)
-        .left_justify();
-    draw.text("Status")
-        .x(col_status)
-        .y(header_y)
-        .font_size(16)
-        .color(GRAY)
-        .left_justify();
 
     // Sitzungsliste
-    for (i, s) in model.sessions.iter().take(8).enumerate() {
-        let y = header_y - 35.0 - (i as f32 * 30.0);
-        let color = match s.state {
-            SessionState::Running => GREEN,
-            SessionState::Done => BLUE,
-            SessionState::Canceled => RED,
-            SessionState::Deleted => GRAY,
-        };
-
-        let status = match s.state {
-            SessionState::Running => "Running",
-            SessionState::Done => "Done",
-            SessionState::Canceled => "Canceled",
-            SessionState::Deleted => "Deleted",
-        };
-
-        draw.text(&s.start.format("%Y-%m-%d %H:%M").to_string())
-            .x(col_time)
-            .y(y)
-            .font_size(15)
-            .color(color)
-            .left_justify();
-        draw.text(&format!("{} min", s.duration.as_secs() / 60))
-            .x(col_dur)
-            .y(y)
-            .font_size(15)
-            .color(color)
-            .left_justify();
-
-        let desc = if s.description.len() > 45 {
-            format!("{}...", &s.description[..42])
-        } else {
-            s.description.clone()
-        };
-        draw.text(&desc)
-            .x(col_desc)
-            .y(y)
-            .font_size(15)
-            .color(color)
-            .left_justify();
-
-        draw.text(status)
-            .x(col_status)
-            .y(y)
-            .font_size(15)
-            .color(color)
-            .left_justify();
-
-        // Trennlinie
-        draw.line()
-            .start(vec2(-450.0, y - 15.0))
-            .end(vec2(450.0, y - 15.0))
-            .weight(1.0)
-            .color(rgb(0.2, 0.2, 0.25));
-    }
+    session_list::draw_history_title(&draw, &model.style);
+    session_list::draw_session_headers(&draw, &model.style);
+    session_list::draw_session_list(&draw, &model.style, &model.sessions);
 
     draw.to_frame(app, &frame).unwrap();
 }

@@ -23,22 +23,22 @@ pub struct Colors {
 impl Colors {
     pub fn new() -> Self {
         Colors {
-            background: rgb(0.1, 0.1, 0.15),
-            title: rgb(1.0, 0.5, 0.0),
-            timer_background: rgb(0.2, 0.2, 0.3),
-            timer_text: rgb(0.0, 1.0, 0.0),
-            description_text: rgb(1.0, 1.0, 1.0),
-            input_background: rgb(0.15, 0.15, 0.2),
-            input_border: rgb(0.4, 0.4, 0.6),
-            input_text: rgb(1.0, 1.0, 1.0),
-            ready_text: rgb(0.5, 0.5, 0.5),
-            history_title: rgb(0.0, 1.0, 1.0),
-            header_text: rgb(0.5, 0.5, 0.5),
-            session_running: rgb(0.0, 1.0, 0.0),
-            session_done: rgb(0.0, 0.0, 1.0),
-            session_canceled: rgb(1.0, 0.0, 0.0),
-            session_deleted: rgb(0.5, 0.5, 0.5),
-            separator: rgb(0.2, 0.2, 0.25),
+            background: rgb(0.08, 0.08, 0.12),       // Dunkler Hintergrund
+            title: rgb(1.0, 0.5, 0.0),               // Orange
+            timer_background: rgb(0.15, 0.15, 0.25), // Dunkler Timer-Hintergrund
+            timer_text: rgb(0.0, 1.0, 0.0),          // Grün
+            description_text: rgb(1.0, 1.0, 1.0),    // Weiß
+            input_background: rgb(0.12, 0.12, 0.2),  // Dunkler Input-Hintergrund
+            input_border: rgb(0.3, 0.3, 0.5),        // Hellere Border-Farbe
+            input_text: rgb(1.0, 1.0, 1.0),          // Weiß
+            ready_text: rgb(0.6, 0.6, 0.6),          // Hellgrau
+            history_title: rgb(0.0, 1.0, 1.0),       // Cyan
+            header_text: rgb(0.6, 0.6, 0.6),         // Hellgrau
+            session_running: rgb(0.0, 1.0, 0.0),     // Grün
+            session_done: rgb(0.0, 0.6, 1.0),        // Blau
+            session_canceled: rgb(1.0, 0.2, 0.2),    // Rot
+            session_deleted: rgb(0.6, 0.6, 0.6),     // Hellgrau
+            separator: rgb(0.2, 0.2, 0.3),           // Dunkler Separator
         }
     }
 }
@@ -84,6 +84,9 @@ pub struct Layout {
     pub col_dur: f32,
     pub col_desc: f32,
     pub col_status: f32,
+    pub container_padding: f32,
+    pub container_radius: f32,
+    pub input_radius: f32,
 }
 
 impl Layout {
@@ -99,6 +102,9 @@ impl Layout {
             col_dur: -180.0,
             col_desc: -100.0,
             col_status: 350.0,
+            container_padding: 20.0,
+            container_radius: 12.0,
+            input_radius: 8.0,
         }
     }
 }

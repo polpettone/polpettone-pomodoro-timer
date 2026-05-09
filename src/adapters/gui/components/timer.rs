@@ -1,4 +1,4 @@
-use super::styles::Style;
+use crate::adapters::gui::styles::styles::Style;
 use crate::domain::session::Session;
 use nannou::prelude::*;
 

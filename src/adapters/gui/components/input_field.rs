@@ -1,4 +1,4 @@
-use super::styles::Style;
+use crate::adapters::gui::styles::styles::Style;
 use nannou::prelude::*;
 
 pub fn draw_ready_state(draw: &Draw, style: &Style, app: &App, description_input: &str) {

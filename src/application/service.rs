@@ -7,10 +7,18 @@ use std::io::Write;
 use std::fs::OpenOptions;
 use crate::date_time::duration_in_minutes;
 
-#[derive(Clone)]
 pub struct SessionService<R: SessionRepository> {
     repository: R,
     session_dir: String, // Still needed for the status file logic for now
+}
+
+impl<R: SessionRepository + Clone> Clone for SessionService<R> {
+    fn clone(&self) -> Self {
+        Self {
+            repository: self.repository.clone(),
+            session_dir: self.session_dir.clone(),
+        }
+    }
 }
 
 impl<R: SessionRepository> SessionService<R> {

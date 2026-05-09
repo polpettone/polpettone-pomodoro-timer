@@ -66,9 +66,6 @@ impl Session {
         )
     }
 
-    pub fn is_active(&self) -> bool {
-        self.state == SessionState::Running
-    }
 
     pub fn remaining_duration(&self) -> Duration {
         let now = Utc::now();

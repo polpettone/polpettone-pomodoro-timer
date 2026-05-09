@@ -77,8 +77,7 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
     let config_path = get_config_path(opts.config);
     let config = load_config(&config_path)?;
@@ -89,5 +88,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let repository = FileSessionRepository::new(pomodoro_session_dir.clone());
     let session_service = SessionService::new(repository, pomodoro_session_dir);
 
-    handle_command(opts.cmd, &session_service).await
+    handle_command(opts.cmd, &session_service)
 }

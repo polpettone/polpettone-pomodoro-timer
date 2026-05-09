@@ -38,4 +38,5 @@ pub enum Command {
         number: u32,
     },
     Server,
+    Gui,
 }

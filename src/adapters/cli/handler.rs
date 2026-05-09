@@ -10,8 +10,9 @@ use std::time::Duration;
 use crate::domain::session::{Session, SessionState};
 use rand::Rng;
 use crate::adapters::http::server;
+use crate::adapters::gui;
 
-pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
+pub fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
     cmd: Command,
     session_service: &SessionService<R>,
 ) -> Result<(), Box<dyn Error>> {
@@ -48,9 +49,22 @@ pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone
             handle_generate_test_data(session_service, number)?;
         }
         Command::Server => {
-            handle_server(session_service).await?;
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            rt.block_on(handle_server(session_service))?;
+        }
+        Command::Gui => {
+            handle_gui(session_service)?;
         }
     }
+    Ok(())
+}
+
+fn handle_gui<R: SessionRepository + Clone + Send + 'static>(
+    session_service: &SessionService<R>
+) -> Result<(), Box<dyn Error>> {
+    gui::run(session_service.clone())?;
     Ok(())
 }
 

@@ -2,7 +2,7 @@ use crate::adapters::gui::styles::styles::Style;
 use nannou::prelude::*;
 
 pub fn draw_ready_state(draw: &Draw, style: &Style, app: &App, description_input: &str) {
-    draw.text("Ready to Start")
+    draw.text("Session")
         .font_size(style.font_sizes.ready_text)
         .xy(vec2(
             style.layout.timer_position.0,

@@ -65,7 +65,7 @@ impl FontSizes {
             ready_text: 48,
             history_title: 28,
             header: 16,
-            session: 15,
+            session: 24,
             input: 24,
             hint: 18,
         }

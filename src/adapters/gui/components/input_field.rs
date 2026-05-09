@@ -23,7 +23,7 @@ pub fn draw_ready_state(draw: &Draw, style: &Style, app: &App, description_input
         .stroke_color(style.colors.input_border);
 
     // Text ohne Cursor
-    draw.text(&format!("Description: {}", description_input))
+    draw.text(&format!("{}", description_input))
         .font_size(style.font_sizes.input)
         .xy(vec2(0.0, style.layout.input_y))
         .color(style.colors.input_text);

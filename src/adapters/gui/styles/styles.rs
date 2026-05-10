@@ -22,23 +22,41 @@ pub struct Colors {
 
 impl Colors {
     pub fn new() -> Self {
+        // Farbkonstanten für das Chocolate Theme
+        let dark_brown = rgb(0.12, 0.10, 0.08);
+        let gold_brown = rgb(0.82, 0.66, 0.48);
+        let darker_brown = rgb(0.20, 0.16, 0.12);
+        let light_brown = rgb(0.87, 0.72, 0.53);
+        let beige = rgb(0.90, 0.85, 0.80);
+        let medium_brown = rgb(0.18, 0.14, 0.10);
+        let border_brown = rgb(0.50, 0.40, 0.30);
+        let gray_brown = rgb(0.60, 0.50, 0.40);
+        let accent_brown = rgb(0.70, 0.55, 0.40);
+        let deep_brown = rgb(0.40, 0.30, 0.20);
+        let separator_brown = rgb(0.30, 0.25, 0.20);
+
+        // Session Status Farben
+        let session_running = rgb(0.50, 0.80, 0.50); // Grün
+        let session_done = rgb(0.40, 0.60, 0.80); // Blau
+        let session_canceled = rgb(0.80, 0.40, 0.40); // Rot
+
         Colors {
-            background: rgb(0.08, 0.08, 0.12),       // Dunkler Hintergrund
-            title: rgb(1.0, 0.5, 0.0),               // Orange
-            timer_background: rgb(0.15, 0.15, 0.25), // Dunkler Timer-Hintergrund
-            timer_text: rgb(0.0, 1.0, 0.0),          // Grün
-            description_text: rgb(1.0, 1.0, 1.0),    // Weiß
-            input_background: rgb(0.12, 0.12, 0.2),  // Dunkler Input-Hintergrund
-            input_border: rgb(0.3, 0.3, 0.5),        // Hellere Border-Farbe
-            input_text: rgb(1.0, 1.0, 1.0),          // Weiß
-            ready_text: rgb(0.6, 0.6, 0.6),          // Hellgrau
-            history_title: rgb(0.0, 1.0, 1.0),       // Cyan
-            header_text: rgb(0.6, 0.6, 0.6),         // Hellgrau
-            session_running: rgb(0.0, 1.0, 0.0),     // Grün
-            session_done: rgb(0.0, 0.6, 1.0),        // Blau
-            session_canceled: rgb(1.0, 0.2, 0.2),    // Rot
-            session_deleted: rgb(0.6, 0.6, 0.6),     // Hellgrau
-            separator: rgb(0.2, 0.2, 0.3),           // Dunkler Separator
+            background: dark_brown,
+            title: gold_brown,
+            timer_background: darker_brown,
+            timer_text: light_brown,
+            description_text: beige,
+            input_background: medium_brown,
+            input_border: border_brown,
+            input_text: beige,
+            ready_text: gray_brown,
+            history_title: accent_brown,
+            header_text: gray_brown,
+            session_running,
+            session_done,
+            session_canceled,
+            session_deleted: deep_brown,
+            separator: separator_brown,
         }
     }
 }
@@ -93,7 +111,7 @@ impl Layout {
     pub fn new() -> Self {
         Layout {
             window_size: (1000, 700),
-            title_position: (150.0, -40.0),
+            title_position: (300.0, -40.0), // Header nach oben rechts verschoben
             timer_position: (0.0, 150.0),
             description_position: (0.0, 50.0),
             input_y: 50.0,

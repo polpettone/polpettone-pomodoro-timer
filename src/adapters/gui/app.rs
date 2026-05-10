@@ -132,10 +132,8 @@ fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
     draw.background().color(model.style.colors.background);
 
-    let win = app.window_rect();
-
     // Titel zeichnen
-    timer::draw_title(&draw, &model.style, win);
+    timer::draw_title(&draw, &model.style);
 
     // Aktive Sitzung oder Timer
     let active_session = model

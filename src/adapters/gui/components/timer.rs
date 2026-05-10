@@ -2,9 +2,9 @@ use crate::adapters::gui::styles::styles::Style;
 use crate::domain::session::Session;
 use nannou::prelude::*;
 
-pub fn draw_title(draw: &Draw, style: &Style, win: Rect) {
+pub fn draw_title(draw: &Draw, style: &Style) {
     draw.text("Polpettone Pomodoro")
-        .xy(win.top_left() + vec2(style.layout.title_position.0, style.layout.title_position.1))
+        .xy(vec2(style.layout.title_position.0, style.layout.title_position.1))
         .font_size(style.font_sizes.title)
         .color(style.colors.title);
 }

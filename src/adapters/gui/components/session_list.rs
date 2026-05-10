@@ -3,7 +3,7 @@ use crate::domain::session::{Session, SessionState};
 use nannou::prelude::*;
 
 pub fn draw_history_title(draw: &Draw, style: &Style) {
-    draw.text("Recent Sessions")
+    draw.text("Sessions")
         .xy(vec2(0.0, style.layout.history_top))
         .font_size(style.font_sizes.history_title)
         .color(style.colors.history_title);

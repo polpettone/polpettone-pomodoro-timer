@@ -71,13 +71,12 @@ pub struct FontSizes {
     pub header: u32,
     pub session: u32,
     pub input: u32,
-    pub hint: u32,
 }
 
 impl FontSizes {
     pub fn new() -> Self {
         FontSizes {
-            title: 48,
+            title: 40,
             timer: 72,
             description: 32,
             ready_text: 48,
@@ -85,7 +84,6 @@ impl FontSizes {
             header: 16,
             session: 24,
             input: 24,
-            hint: 18,
         }
     }
 }
@@ -102,16 +100,13 @@ pub struct Layout {
     pub col_dur: f32,
     pub col_desc: f32,
     pub col_status: f32,
-    pub container_padding: f32,
-    pub container_radius: f32,
-    pub input_radius: f32,
 }
 
 impl Layout {
     pub fn new() -> Self {
         Layout {
             window_size: (1000, 700),
-            title_position: (300.0, -40.0), // Header nach oben rechts verschoben
+            title_position: (0.0, 360.0), // Header zentriert über dem Timer
             timer_position: (0.0, 150.0),
             description_position: (0.0, 50.0),
             input_y: 50.0,
@@ -120,9 +115,6 @@ impl Layout {
             col_dur: -180.0,
             col_desc: -100.0,
             col_status: 350.0,
-            container_padding: 20.0,
-            container_radius: 12.0,
-            input_radius: 8.0,
         }
     }
 }

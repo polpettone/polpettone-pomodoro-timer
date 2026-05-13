@@ -12,7 +12,3 @@ serde_json = "1.0"
 gloo-net = "0.5"
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 console_error_panic_hook = "0.1.7"
-# Wir könnten auch die Domain-Modelle aus dem Haupt-Crate teilen, 
-# aber dafür müssten wir sie in ein eigenes Crate auslagern oder das Haupt-Crate als Dependency hinzufügen.
-# Da das Haupt-Crate eine Binary ist, ist das schwierig.
-# Für den Anfang definieren wir die benötigten Modelle im Frontend neu oder verschieben sie später.

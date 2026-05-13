@@ -38,11 +38,16 @@ fn get_config_path(custom_path: Option<String>) -> PathBuf {
     if let Some(path) = custom_path {
         PathBuf::from(path)
     } else {
-        home_dir()
-            .unwrap_or_default()
-            .join(".config")
-            .join("polpettone-pomodoro-timer")
-            .join("config.toml")
+        let local_config = PathBuf::from("config.toml");
+        if local_config.exists() {
+            local_config
+        } else {
+            home_dir()
+                .unwrap_or_default()
+                .join(".config")
+                .join("polpettone-pomodoro-timer")
+                .join("config.toml")
+        }
     }
 }
 
@@ -94,14 +99,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let pomodoro_session_dir = std::env::var("POMODORO_SESSION_DIR")
         .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir.clone());
 
-    let (repository, user_repository) = match config.pomodoro_config.persistence_mode {
+    let persistence_mode = std::env::var("PERSISTENCE_MODE")
+        .ok()
+        .and_then(|s| match s.to_lowercase().as_str() {
+            "file" => Some(PersistenceMode::File),
+            "postgres" => Some(PersistenceMode::Postgres),
+            _ => None,
+        })
+        .unwrap_or(config.pomodoro_config.persistence_mode);
+
+    let database_url = std::env::var("DATABASE_URL")
+        .ok()
+        .or(config.pomodoro_config.database_url);
+
+    let (repository, user_repository) = match persistence_mode {
         PersistenceMode::File => {
             let session_repo = FileSessionRepository::new(pomodoro_session_dir.clone());
             let user_repo = Arc::new(StaticUserRepository::new());
             (CombinedRepository::File(session_repo), user_repo as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
         }
         PersistenceMode::Postgres => {
-            let db_url = config.pomodoro_config.database_url.expect("database_url must be set for postgres mode");
+            let db_url = database_url.expect("database_url must be set for postgres mode");
             let pool = PgPool::connect(&db_url).await?;
             let repo = PostgresRepository::new(pool);
             repo.init_db().await?;

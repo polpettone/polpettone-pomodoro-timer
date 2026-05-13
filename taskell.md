@@ -1,11 +1,14 @@
 ## To Do
 
-- postgres setup
-- postgres repo
 - user -> sessions
+- load tests
+- e2e tests
+- code review
 
 ## Doing
 
 
 ## Done
 
+- postgres setup
+- postgres repo

@@ -1,4 +1,3 @@
-
 # Pomodoro Timer
 
 A command line pomodoro timer.

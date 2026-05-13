@@ -1,4 +1,5 @@
 use crate::application::service::SessionService;
+use crate::application::auth_service::AuthService;
 use crate::domain::repository::SessionRepository;
 use crate::adapters::cli::command::Command;
 use crate::adapters::cli::display;
@@ -73,7 +74,8 @@ async fn handle_server<R: SessionRepository + Send + Sync + 'static + Clone>(
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn Error>> {
-    server::run_server(session_service.clone(), host, port).await?;
+    let auth_service = AuthService::new();
+    server::run_server(session_service.clone(), auth_service, host, port).await?;
     Ok(())
 }
 

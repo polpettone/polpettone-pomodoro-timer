@@ -2,10 +2,13 @@ use axum::{
     routing::{get, post},
     extract::{State, Query},
     Json, Router,
+    http::{StatusCode, HeaderMap},
 };
 use tower_http::cors::{Any, CorsLayer};
 use crate::application::service::SessionService;
+use crate::application::auth_service::AuthService;
 use crate::domain::repository::SessionRepository;
+use crate::domain::user::{LoginRequest, LoginResponse};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::net::SocketAddr;
@@ -17,6 +20,7 @@ use std::time::Duration;
 
 pub struct AppState<R: SessionRepository> {
     pub service: SessionService<R>,
+    pub auth_service: AuthService,
 }
 
 #[derive(Deserialize)]
@@ -39,10 +43,11 @@ pub struct GenerateRequest {
 
 pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
     service: SessionService<R>,
+    auth_service: AuthService,
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(AppState { service });
+    let state = Arc::new(AppState { service, auth_service });
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -50,6 +55,7 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/login", post(login::<R>))
         .route("/sessions/start", post(start_session::<R>))
         .route("/sessions/active", get(get_active_sessions::<R>))
         .route("/sessions", get(get_sessions::<R>))
@@ -67,32 +73,64 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
     Ok(())
 }
 
+async fn login<R: SessionRepository + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<R>>>,
+    Json(payload): Json<LoginRequest>,
+) -> Result<Json<LoginResponse>, (StatusCode, String)> {
+    state.auth_service.login(payload)
+        .map(Json)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+}
+
+fn check_auth<R: SessionRepository>(
+    state: &AppState<R>,
+    headers: &HeaderMap,
+) -> Result<String, (StatusCode, String)> {
+    let auth_header = headers.get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header".to_string()))?;
+
+    if !auth_header.starts_with("Bearer ") {
+        return Err((StatusCode::UNAUTHORIZED, "Invalid Authorization header format".to_string()));
+    }
+
+    let token = &auth_header[7..];
+    state.auth_service.validate_token(token)
+        .ok_or((StatusCode::UNAUTHORIZED, "Invalid token".to_string()))
+}
+
 async fn start_session<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
+    headers: HeaderMap,
     Json(payload): Json<StartSessionRequest>,
-) -> Result<Json<String>, String> {
+) -> Result<Json<String>, (StatusCode, String)> {
+    check_auth(&state, &headers)?;
     state.service.start_session(&payload.description, payload.duration_minutes * 60)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session started".to_string()))
 }
 
 async fn get_active_sessions<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
-) -> Result<Json<Vec<Session>>, String> {
+    headers: HeaderMap,
+) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
+    check_auth(&state, &headers)?;
     let sessions = state.service.find_all_active_sessions()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
 }
 
 async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
+    headers: HeaderMap,
     Query(params): Query<FindSessionsRequest>,
-) -> Result<Json<Vec<Session>>, String> {
+) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
+    check_auth(&state, &headers)?;
     let now = Utc::now();
     let start = if let Some(s) = params.start {
         NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
             .map(|dt| dt.and_utc())
-            .map_err(|_| "Invalid start date. Use YYYY-MM-DD HH:MM:SS".to_string())?
+            .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid start date. Use YYYY-MM-DD HH:MM:SS".to_string()))?
     } else {
         now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc()
     };
@@ -100,28 +138,32 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
     let end = if let Some(e) = params.end {
         NaiveDateTime::parse_from_str(&e, "%Y-%m-%d %H:%M:%S")
             .map(|dt| dt.and_utc())
-            .map_err(|_| "Invalid end date. Use YYYY-MM-DD HH:MM:SS".to_string())?
+            .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid end date. Use YYYY-MM-DD HH:MM:SS".to_string()))?
     } else {
         now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc()
     };
 
     let sessions = state.service.find_sessions_in_range(start, end, params.query)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
 }
 
 async fn init_session_dir<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
-) -> Result<Json<String>, String> {
+    headers: HeaderMap,
+) -> Result<Json<String>, (StatusCode, String)> {
+    check_auth(&state, &headers)?;
     state.service.init_session_dir()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session directory initialized".to_string()))
 }
 
 async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
+    headers: HeaderMap,
     Json(payload): Json<GenerateRequest>,
-) -> Result<Json<String>, String> {
+) -> Result<Json<String>, (StatusCode, String)> {
+    check_auth(&state, &headers)?;
     let mut rng = rand::rng();
     let now = Utc::now();
     let descriptions = vec![
@@ -148,7 +190,7 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
             state: SessionState::Done,
             ratings: None,
         };
-        state.service.save_session(&session).map_err(|e| e.to_string())?;
+        state.service.save_session(&session).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
     Ok(Json(format!("Generated {} test sessions", payload.number)))

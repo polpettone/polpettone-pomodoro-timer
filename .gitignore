@@ -3,3 +3,4 @@
 /.idea 
 /.junie
 /frontend/dist
+.env

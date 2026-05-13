@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use gloo_net::http::Request;
 use chrono::Utc;
 
+const API_BASE_URL: &str = match option_env!("API_URL") {
+    Some(url) => url,
+    None => "http://127.0.0.1:3000",
+};
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Duration {
     pub secs: u64,
@@ -43,7 +48,7 @@ fn App() -> impl IntoView {
 }
 
 async fn fetch_active_sessions() -> Result<Vec<Session>, String> {
-    let resp = Request::get("http://127.0.0.1:3000/sessions/active")
+    let resp = Request::get(&format!("{}/sessions/active", API_BASE_URL))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -58,7 +63,7 @@ async fn fetch_active_sessions() -> Result<Vec<Session>, String> {
 }
 
 async fn fetch_all_sessions() -> Result<Vec<Session>, String> {
-    let resp = Request::get("http://127.0.0.1:3000/sessions?start=2000-01-01%2000:00:00&end=2099-12-31%2023:59:59")
+    let resp = Request::get(&format!("{}/sessions?start=2000-01-01%2000:00:00&end=2099-12-31%2023:59:59", API_BASE_URL))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -225,7 +230,7 @@ fn StartSession(#[prop(into)] on_success: Callback<()>) -> impl IntoView {
                 "duration_minutes": dur,
             });
 
-            Request::post("http://127.0.0.1:3000/sessions/start")
+            Request::post(&format!("{}/sessions/start", API_BASE_URL))
                 .json(&payload)
                 .map_err(|e| e.to_string())?
                 .send()

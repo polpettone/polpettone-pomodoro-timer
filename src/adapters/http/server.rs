@@ -39,6 +39,8 @@ pub struct GenerateRequest {
 
 pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
     service: SessionService<R>,
+    host: String,
+    port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState { service });
 
@@ -56,7 +58,8 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
         .layer(cors)
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr_str = format!("{}:{}", host, port);
+    let addr: SocketAddr = addr_str.parse()?;
     println!("Server running on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

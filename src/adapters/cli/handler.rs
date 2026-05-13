@@ -48,11 +48,11 @@ pub fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
         Command::GenerateTestData { number } => {
             handle_generate_test_data(session_service, number)?;
         }
-        Command::Server => {
+        Command::Server { host, port } => {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?;
-            rt.block_on(handle_server(session_service))?;
+            rt.block_on(handle_server(session_service, host, port))?;
         }
         Command::Gui => {
             handle_gui(session_service)?;
@@ -69,9 +69,11 @@ fn handle_gui<R: SessionRepository + Clone + Send + 'static>(
 }
 
 async fn handle_server<R: SessionRepository + Send + Sync + 'static + Clone>(
-    session_service: &SessionService<R>
+    session_service: &SessionService<R>,
+    host: String,
+    port: u16,
 ) -> Result<(), Box<dyn Error>> {
-    server::run_server(session_service.clone()).await?;
+    server::run_server(session_service.clone(), host, port).await?;
     Ok(())
 }
 

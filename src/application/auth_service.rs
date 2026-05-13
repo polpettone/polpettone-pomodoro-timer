@@ -1,5 +1,14 @@
 use crate::domain::user::{User, LoginRequest, LoginResponse};
 use std::error::Error;
+use serde::{Serialize, Deserialize};
+use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
+use chrono::Utc;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String, // Username
+    exp: usize,
+}
 
 pub struct AuthService {
     // Statische Liste von Benutzern
@@ -20,9 +29,13 @@ impl AuthService {
                 password_hash: "password".to_string(),
             },
         ];
+        
+        // In Produktion sollte das Geheimnis über eine Umgebungsvariable gesetzt werden
+        let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-key".to_string());
+        
         Self {
             users,
-            secret: "super-secret-key".to_string(),
+            secret,
         }
     }
 
@@ -31,10 +44,25 @@ impl AuthService {
         
         if let Some(user) = user {
             if user.password_hash == request.password {
-                // Generiere ein einfaches Token (für Iteration 1 reicht der Username)
-                // In einer echten App wäre das ein signiertes JWT
+                // Produktionsreife Token-Generierung mit JWT
+                let expiration = Utc::now()
+                    .checked_add_signed(chrono::Duration::hours(24))
+                    .expect("valid timestamp")
+                    .timestamp() as usize;
+
+                let claims = Claims {
+                    sub: user.username.clone(),
+                    exp: expiration,
+                };
+
+                let token = encode(
+                    &Header::default(),
+                    &claims,
+                    &EncodingKey::from_secret(self.secret.as_ref()),
+                )?;
+
                 return Ok(LoginResponse {
-                    token: format!("token-for-{}", user.username),
+                    token,
                 });
             }
         }
@@ -43,13 +71,23 @@ impl AuthService {
     }
 
     pub fn validate_token(&self, token: &str) -> Option<String> {
-        if token.starts_with("token-for-") {
-            let username = &token[10..];
-            if self.users.iter().any(|u| u.username == username) {
-                return Some(username.to_string());
+        let validation = Validation::default();
+        match decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.secret.as_ref()),
+            &validation,
+        ) {
+            Ok(token_data) => {
+                let username = token_data.claims.sub;
+                // Optional: Prüfen, ob der Benutzer noch in unserer statischen Liste existiert
+                if self.users.iter().any(|u| u.username == username) {
+                    Some(username)
+                } else {
+                    None
+                }
             }
+            Err(_) => None,
         }
-        None
     }
 }
 

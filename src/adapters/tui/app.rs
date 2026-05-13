@@ -85,7 +85,8 @@ impl App {
                 if remaining.as_secs() == 0 {
                     session.state = SessionState::Done;
                     let repo = FileSessionRepository::new(session_dir.clone());
-                    let _ = repo.save(session);
+                    let handle = tokio::runtime::Handle::current();
+                    let _ = handle.block_on(repo.save(session));
                 }
             }
         }
@@ -233,7 +234,8 @@ impl App {
                     original_session.tags = new_tags;
                 }
 
-                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
             }
         }
         Ok(())
@@ -253,7 +255,8 @@ impl App {
                     original_session.notes = new_notes;
                 }
 
-                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
             }
         }
         Ok(())
@@ -278,7 +281,8 @@ impl App {
                     original_session.ratings = Some(ratings);
                 }
 
-                FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
             }
         }
         Ok(())
@@ -294,7 +298,8 @@ impl App {
                          original_session.state = SessionState::Canceled;
                      }
                      
-                     FileSessionRepository::new(self.session_dir.clone()).save(selected_session)?;
+                     let handle = tokio::runtime::Handle::current();
+                     handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
                 }
             }
          }
@@ -311,7 +316,8 @@ impl App {
                     original_session.state = SessionState::Deleted;
                 }
 
-                FileSessionRepository::new(self.session_dir.clone()).save(&deleted_session)?;
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&deleted_session))?;
                 self.filter_sessions();
             }
         }
@@ -332,7 +338,8 @@ impl App {
                     ratings: selected_session.ratings.clone(),
                 };
 
-                FileSessionRepository::new(self.session_dir.clone()).save(&new_session)?;
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&new_session))?;
                 self.sessions.push(new_session);
                 self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
                 self.filter_sessions();
@@ -385,7 +392,8 @@ impl App {
                         }
                         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
-                        FileSessionRepository::new(self.session_dir.clone()).save(&edited_session)?;
+                        let handle = tokio::runtime::Handle::current();
+                        handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&edited_session))?;
 
                         self.filter_sessions();
                     }
@@ -411,7 +419,8 @@ impl App {
             ratings: None,
         };
         
-        FileSessionRepository::new(self.session_dir.clone()).save(&session)?;
+        let handle = tokio::runtime::Handle::current();
+        handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&session))?;
         
         self.sessions.push(session);
         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
@@ -433,7 +442,8 @@ impl App {
                 if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
                     session.state = SessionState::Done;
                     let repo = FileSessionRepository::new(self.session_dir.clone());
-                    let _ = repo.save(session);
+                    let handle = tokio::runtime::Handle::current();
+                    let _ = handle.block_on(repo.save(session));
                     changed = true;
                 }
             }

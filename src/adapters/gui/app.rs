@@ -44,18 +44,19 @@ pub fn run<R: SessionRepository + Send + 'static>(
 
     // Service thread
     std::thread::spawn(move || {
+        let handle = tokio::runtime::Handle::current();
         loop {
             // Check for commands
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     GuiCommand::StartSession(desc, dur) => {
-                        let _ = session_service.start_session(&desc, dur);
+                        let _ = handle.block_on(session_service.start_session(&desc, dur));
                     }
                 }
             }
 
             // Send periodic updates
-            if let Ok(mut sessions) = session_service.load_sessions() {
+            if let Ok(mut sessions) = handle.block_on(session_service.load_sessions()) {
                 sessions.sort_by(|a, b| b.start.cmp(&a.start));
                 let _ = data_tx.send(GuiData { sessions });
             }

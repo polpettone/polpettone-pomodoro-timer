@@ -26,7 +26,7 @@ impl<R: SessionRepository> SessionService<R> {
         Self { repository, session_dir }
     }
 
-    pub fn start_session(
+    pub async fn start_session(
         &self,
         description: &str,
         duration_seconds: u64,
@@ -43,29 +43,29 @@ impl<R: SessionRepository> SessionService<R> {
             ratings: None,
         };
 
-        self.repository.save(&session)?;
+        self.repository.save(&session).await?;
         Ok(())
     }
 
-    pub fn init_session_dir(&self) -> Result<(), Box<dyn Error>> {
-        self.repository.init_storage()?;
+    pub async fn init_session_dir(&self) -> Result<(), Box<dyn Error>> {
+        self.repository.init_storage().await?;
         Ok(())
     }
 
-    pub fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
-        self.repository.find_all()
+    pub async fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
+        self.repository.find_all().await
     }
 
-    pub fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
-        self.repository.save(session)
+    pub async fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
+        self.repository.save(session).await
     }
 
     pub fn pomodoro_session_dir_clone(&self) -> String {
         self.session_dir.clone()
     }
 
-    pub fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
-        let sessions = self.repository.find_all()?;
+    pub async fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
+        let sessions = self.repository.find_all().await?;
         let now = Utc::now();
         let active_sessions = sessions
             .into_iter()
@@ -75,8 +75,8 @@ impl<R: SessionRepository> SessionService<R> {
         Ok(active_sessions)
     }
 
-    pub fn update_pomodoro_status(&self) -> Result<(), Box<dyn Error>> {
-        if let Ok(sessions) = self.find_all_active_sessions() {
+    pub async fn update_pomodoro_status(&self) -> Result<(), Box<dyn Error>> {
+        if let Ok(sessions) = self.find_all_active_sessions().await {
             if let Some(session) = sessions.get(0) {
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -96,13 +96,13 @@ impl<R: SessionRepository> SessionService<R> {
         Ok(())
     }
 
-    pub fn find_sessions_in_range(
+    pub async fn find_sessions_in_range(
         &self,
         range_start: DateTime<Utc>,
         range_end: DateTime<Utc>,
         search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn Error>> {
-        let sessions = self.repository.find_in_range(range_start, range_end)?;
+        let sessions = self.repository.find_in_range(range_start, range_end).await?;
         
         let filtered = if let Some(query) = search_query {
             let query = query.to_lowercase();

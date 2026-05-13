@@ -77,12 +77,12 @@ async fn login<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, (StatusCode, String)> {
-    state.auth_service.login(payload)
+    state.auth_service.login(payload).await
         .map(Json)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
 }
 
-fn check_auth<R: SessionRepository>(
+async fn check_auth<R: SessionRepository>(
     state: &AppState<R>,
     headers: &HeaderMap,
 ) -> Result<String, (StatusCode, String)> {
@@ -95,7 +95,7 @@ fn check_auth<R: SessionRepository>(
     }
 
     let token = &auth_header[7..];
-    state.auth_service.validate_token(token)
+    state.auth_service.validate_token(token).await
         .ok_or((StatusCode::UNAUTHORIZED, "Invalid token".to_string()))
 }
 
@@ -104,8 +104,8 @@ async fn start_session<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Json(payload): Json<StartSessionRequest>,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers)?;
-    state.service.start_session(&payload.description, payload.duration_minutes * 60)
+    check_auth(&state, &headers).await?;
+    state.service.start_session(&payload.description, payload.duration_minutes * 60).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session started".to_string()))
 }
@@ -114,8 +114,8 @@ async fn get_active_sessions<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
-    check_auth(&state, &headers)?;
-    let sessions = state.service.find_all_active_sessions()
+    check_auth(&state, &headers).await?;
+    let sessions = state.service.find_all_active_sessions().await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
 }
@@ -125,7 +125,7 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Query(params): Query<FindSessionsRequest>,
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
-    check_auth(&state, &headers)?;
+    check_auth(&state, &headers).await?;
     let now = Utc::now();
     let start = if let Some(s) = params.start {
         NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
@@ -143,7 +143,7 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
         now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc()
     };
 
-    let sessions = state.service.find_sessions_in_range(start, end, params.query)
+    let sessions = state.service.find_sessions_in_range(start, end, params.query).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
 }
@@ -152,8 +152,8 @@ async fn init_session_dir<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     headers: HeaderMap,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers)?;
-    state.service.init_session_dir()
+    check_auth(&state, &headers).await?;
+    state.service.init_session_dir().await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session directory initialized".to_string()))
 }
@@ -163,8 +163,7 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Json(payload): Json<GenerateRequest>,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers)?;
-    let mut rng = rand::rng();
+    check_auth(&state, &headers).await?;
     let now = Utc::now();
     let descriptions = vec![
         "Implement feature X", "Fix bug Y", "Code review", "Planning meeting",
@@ -172,25 +171,28 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
     ];
 
     for _ in 0..payload.number {
-        let days_ago = rng.random_range(0..30);
-        let hours_ago = rng.random_range(0..24);
-        let minutes_ago = rng.random_range(0..60);
+        let session = {
+            let mut rng = rand::rng();
+            let days_ago = rng.random_range(0..30);
+            let hours_ago = rng.random_range(0..24);
+            let minutes_ago = rng.random_range(0..60);
 
-        let start_time = now
-            - ChronoDuration::days(days_ago)
-            - ChronoDuration::hours(hours_ago)
-            - ChronoDuration::minutes(minutes_ago);
+            let start_time = now
+                - ChronoDuration::days(days_ago)
+                - ChronoDuration::hours(hours_ago)
+                - ChronoDuration::minutes(minutes_ago);
 
-        let session = Session {
-            description: descriptions[rng.random_range(0..descriptions.len())].to_string(),
-            duration: Duration::from_secs(25 * 60),
-            start: start_time,
-            tags: vec![],
-            notes: String::new(),
-            state: SessionState::Done,
-            ratings: None,
+            Session {
+                description: descriptions[rng.random_range(0..descriptions.len())].to_string(),
+                duration: Duration::from_secs(25 * 60),
+                start: start_time,
+                tags: vec![],
+                notes: String::new(),
+                state: SessionState::Done,
+                ratings: None,
+            }
         };
-        state.service.save_session(&session).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        state.service.save_session(&session).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
     Ok(Json(format!("Generated {} test sessions", payload.number)))

@@ -1,14 +1,21 @@
 use crate::domain::session::Session;
+use crate::domain::user::User;
 use chrono::{DateTime, Utc};
 use std::error::Error;
+use std::future::Future;
+use std::pin::Pin;
 
 pub trait SessionRepository {
-    fn save(&self, session: &Session) -> Result<(), Box<dyn Error>>;
-    fn find_all(&self) -> Result<Vec<Session>, Box<dyn Error>>;
+    fn save(&self, session: &Session) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>>;
+    fn find_all(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>>;
     fn find_in_range(
         &self,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-    ) -> Result<Vec<Session>, Box<dyn Error>>;
-    fn init_storage(&self) -> Result<(), Box<dyn Error>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>>;
+    fn init_storage(&self) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>>;
+}
+
+pub trait UserRepository {
+    fn find_by_username(&self, username: &str) -> Pin<Box<dyn Future<Output = Result<Option<User>, Box<dyn Error>>> + Send + '_>>;
 }

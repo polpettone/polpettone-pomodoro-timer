@@ -13,47 +13,45 @@ use rand::Rng;
 use crate::adapters::http::server;
 use crate::adapters::gui;
 
-pub fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
+pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
     cmd: Command,
     session_service: &SessionService<R>,
+    auth_service: AuthService,
 ) -> Result<(), Box<dyn Error>> {
     match cmd {
-        Command::Tui => handle_tui(session_service)?,
-        Command::InitSessionDir => handle_init_session_dir(session_service)?,
+        Command::Tui => handle_tui(session_service).await?,
+        Command::InitSessionDir => handle_init_session_dir(session_service).await?,
         Command::Start {
             duration,
             description,
-        } => handle_start(session_service, description, duration)?,
-        Command::Active => handle_active(session_service)?,
-        Command::Watch => handle_watch(session_service)?,
+        } => handle_start(session_service, description, duration).await?,
+        Command::Active => handle_active(session_service).await?,
+        Command::Watch => handle_watch(session_service).await?,
         Command::FindSessionsInRange {
             start_date,
             end_date,
             search_query,
             export,
         } => {
-            handle_find_sessions_in_range(session_service, start_date, end_date, search_query, export)?;
+            handle_find_sessions_in_range(session_service, start_date, end_date, search_query, export).await?;
         }
         Command::FindSessionFromToday {
             search_query,
             export,
         } => {
-            handle_find_today(session_service, search_query, export)?;
+            handle_find_today(session_service, search_query, export).await?;
         }
         Command::FindSessionFromYesterday {
             search_query,
             export,
         } => {
-            handle_find_yesterday(session_service, search_query, export)?;
+            handle_find_yesterday(session_service, search_query, export).await?;
         }
         Command::GenerateTestData { number } => {
-            handle_generate_test_data(session_service, number)?;
+            handle_generate_test_data(session_service, number).await?;
         }
         Command::Server { host, port } => {
-            let rt = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()?;
-            rt.block_on(handle_server(session_service, host, port))?;
+            handle_server(session_service, auth_service, host, port).await?;
         }
         Command::Gui => {
             handle_gui(session_service)?;
@@ -71,16 +69,16 @@ fn handle_gui<R: SessionRepository + Clone + Send + 'static>(
 
 async fn handle_server<R: SessionRepository + Send + Sync + 'static + Clone>(
     session_service: &SessionService<R>,
+    auth_service: AuthService,
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn Error>> {
-    let auth_service = AuthService::new();
     server::run_server(session_service.clone(), auth_service, host, port).await?;
     Ok(())
 }
 
-fn handle_tui<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
-    let sessions = session_service.load_sessions()?;
+async fn handle_tui<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+    let sessions = session_service.load_sessions().await?;
     // This is a bit tricky since App currently expects a String dir. 
     // We'll fix App later when moving TUI to adapters.
     let mut app = App::new(sessions, session_service.pomodoro_session_dir_clone());
@@ -88,13 +86,13 @@ fn handle_tui<R: SessionRepository>(session_service: &SessionService<R>) -> Resu
     Ok(())
 }
 
-fn handle_init_session_dir<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_init_session_dir<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
     println!("init session dir");
-    session_service.init_session_dir()?;
+    session_service.init_session_dir().await?;
     Ok(())
 }
 
-fn handle_start<R: SessionRepository>(
+async fn handle_start<R: SessionRepository>(
     session_service: &SessionService<R>,
     description: String,
     duration: u64,
@@ -104,13 +102,13 @@ fn handle_start<R: SessionRepository>(
     println!("Duration: {} minutes", duration);
     println!("Description: {}", description);
 
-    session_service.start_session(&description, duration * 60)?;
+    session_service.start_session(&description, duration * 60).await?;
     Ok(())
 }
 
-fn handle_active<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_active<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
     println!("Showing all sessions");
-    match session_service.find_all_active_sessions() {
+    match session_service.find_all_active_sessions().await {
         Ok(sessions) => {
             if let Err(e) = display::print_table(sessions) {
                 println!("Error printing table: {}", e);
@@ -123,11 +121,11 @@ fn handle_active<R: SessionRepository>(session_service: &SessionService<R>) -> R
     Ok(())
 }
 
-fn handle_watch<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_watch<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
     loop {
-        match session_service.find_all_active_sessions() {
+        match session_service.find_all_active_sessions().await {
             Ok(sessions) => {
-                session_service.update_pomodoro_status()?;
+                session_service.update_pomodoro_status().await?;
                 const ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE: &str = "\x1B[2J\x1B[1;1H";
                 print!("{}", ANSI_ESCAPE_CODE_FOR_SCREEN_ERASE);
                 for session in sessions {
@@ -158,7 +156,7 @@ fn handle_watch<R: SessionRepository>(session_service: &SessionService<R>) -> Re
     }
 }
 
-fn handle_find_sessions_in_range<R: SessionRepository>(
+async fn handle_find_sessions_in_range<R: SessionRepository>(
     session_service: &SessionService<R>,
     start_date: String,
     end_date: String,
@@ -172,7 +170,7 @@ fn handle_find_sessions_in_range<R: SessionRepository>(
 
     match (parsed_start, parsed_end) {
         (Ok(start), Ok(end)) => {
-            match session_service.find_sessions_in_range(start, end, search_query) {
+            match session_service.find_sessions_in_range(start, end, search_query).await {
                 Ok(sessions) => {
                     if export {
                         display::export_to_ascii_table(sessions)?;
@@ -188,7 +186,7 @@ fn handle_find_sessions_in_range<R: SessionRepository>(
     Ok(())
 }
 
-fn handle_find_today<R: SessionRepository>(
+async fn handle_find_today<R: SessionRepository>(
     session_service: &SessionService<R>,
     search_query: Option<String>,
     export: bool,
@@ -197,7 +195,7 @@ fn handle_find_today<R: SessionRepository>(
     let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-    match session_service.find_sessions_in_range(start, end, search_query) {
+    match session_service.find_sessions_in_range(start, end, search_query).await {
         Ok(sessions) => {
             if export {
                 display::export_to_ascii_table(sessions)?;
@@ -210,7 +208,7 @@ fn handle_find_today<R: SessionRepository>(
     Ok(())
 }
 
-fn handle_find_yesterday<R: SessionRepository>(
+async fn handle_find_yesterday<R: SessionRepository>(
     session_service: &SessionService<R>,
     search_query: Option<String>,
     export: bool,
@@ -220,7 +218,7 @@ fn handle_find_yesterday<R: SessionRepository>(
     let start = yesterday.and_hms_opt(0, 0, 0).unwrap().and_utc();
     let end = yesterday.and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-    match session_service.find_sessions_in_range(start, end, search_query) {
+    match session_service.find_sessions_in_range(start, end, search_query).await {
         Ok(sessions) => {
             if export {
                 display::export_to_ascii_table(sessions)?;
@@ -233,7 +231,7 @@ fn handle_find_yesterday<R: SessionRepository>(
     Ok(())
 }
 
-fn handle_generate_test_data<R: SessionRepository>(
+async fn handle_generate_test_data<R: SessionRepository>(
     session_service: &SessionService<R>,
     number: u32,
 ) -> Result<(), Box<dyn Error>> {
@@ -272,12 +270,7 @@ fn handle_generate_test_data<R: SessionRepository>(
             ratings: None,
         };
 
-        // We use the repository directly or add a save method to service
-        // For simplicity, let's say service has a load/save if needed or we use the repo
-        // Actually, start_session creates a new one, but here we want to save a specific one.
-        // I'll just use the repository from the service if I make it public or add a method.
-        // Let's add a `save_session` to SessionService.
-        session_service.save_session(&session)?;
+        session_service.save_session(&session).await?;
     }
     println!("Done.");
     Ok(())

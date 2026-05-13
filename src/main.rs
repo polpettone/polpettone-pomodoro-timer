@@ -4,9 +4,13 @@ mod config;
 mod date_time;
 mod domain;
 
-use crate::config::Config;
+use crate::config::{Config, PersistenceMode};
 use crate::adapters::persistence::file_repository::FileSessionRepository;
+use crate::adapters::persistence::postgres_repository::PostgresRepository;
+use crate::adapters::persistence::static_user_repository::StaticUserRepository;
+use crate::adapters::persistence::CombinedRepository;
 use crate::application::service::SessionService;
+use crate::application::auth_service::AuthService;
 use crate::adapters::cli::handler::handle_command;
 use crate::adapters::cli::command::Command;
 
@@ -15,7 +19,9 @@ use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
+use std::sync::Arc;
 use structopt::StructOpt;
+use sqlx::PgPool;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -53,6 +59,7 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
                     r#"
     [pomodoro_config]
     pomodoro_session_dir = "{}/polpettone-pomodoro-timer-sessions/"
+    persistence_mode = "file"
     "#,
                     home_str
                 );
@@ -77,16 +84,33 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    dotenvy::dotenv().ok();
     let opts = Opts::from_args();
     let config_path = get_config_path(opts.config);
     let config = load_config(&config_path)?;
 
     let pomodoro_session_dir = std::env::var("POMODORO_SESSION_DIR")
-        .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir);
+        .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir.clone());
 
-    let repository = FileSessionRepository::new(pomodoro_session_dir.clone());
+    let (repository, user_repository) = match config.pomodoro_config.persistence_mode {
+        PersistenceMode::File => {
+            let session_repo = FileSessionRepository::new(pomodoro_session_dir.clone());
+            let user_repo = Arc::new(StaticUserRepository::new());
+            (CombinedRepository::File(session_repo), user_repo as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
+        }
+        PersistenceMode::Postgres => {
+            let db_url = config.pomodoro_config.database_url.expect("database_url must be set for postgres mode");
+            let pool = PgPool::connect(&db_url).await?;
+            let repo = PostgresRepository::new(pool);
+            repo.init_db().await?;
+            (CombinedRepository::Postgres(repo.clone()), Arc::new(repo) as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
+        }
+    };
+
     let session_service = SessionService::new(repository, pomodoro_session_dir);
+    let auth_service = AuthService::new(user_repository);
 
-    handle_command(opts.cmd, &session_service)
+    handle_command(opts.cmd, &session_service, auth_service).await
 }

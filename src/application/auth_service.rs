@@ -1,5 +1,7 @@
-use crate::domain::user::{User, LoginRequest, LoginResponse};
+use crate::domain::user::{LoginRequest, LoginResponse};
+use crate::domain::repository::UserRepository;
 use std::error::Error;
+use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 use chrono::Utc;
@@ -11,36 +13,23 @@ struct Claims {
 }
 
 pub struct AuthService {
-    // Statische Liste von Benutzern
-    users: Vec<User>,
-    // In einer echten App wäre das ein Geheimnis für JWT oder Sessions
+    user_repository: Arc<dyn UserRepository + Send + Sync>,
     secret: String,
 }
 
 impl AuthService {
-    pub fn new() -> Self {
-        let users = vec![
-            User {
-                username: "admin".to_string(),
-                password_hash: "admin".to_string(), // In Iteration 1 einfach Klartext
-            },
-            User {
-                username: "user".to_string(),
-                password_hash: "password".to_string(),
-            },
-        ];
-        
+    pub fn new(user_repository: Arc<dyn UserRepository + Send + Sync>) -> Self {
         // In Produktion sollte das Geheimnis über eine Umgebungsvariable gesetzt werden
         let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-key".to_string());
         
         Self {
-            users,
+            user_repository,
             secret,
         }
     }
 
-    pub fn login(&self, request: LoginRequest) -> Result<LoginResponse, Box<dyn Error>> {
-        let user = self.users.iter().find(|u| u.username == request.username);
+    pub async fn login(&self, request: LoginRequest) -> Result<LoginResponse, Box<dyn Error>> {
+        let user = self.user_repository.find_by_username(&request.username).await?;
         
         if let Some(user) = user {
             if user.password_hash == request.password {
@@ -70,7 +59,7 @@ impl AuthService {
         Err("Ungültiger Benutzername oder Passwort".into())
     }
 
-    pub fn validate_token(&self, token: &str) -> Option<String> {
+    pub async fn validate_token(&self, token: &str) -> Option<String> {
         let validation = Validation::default();
         match decode::<Claims>(
             token,
@@ -79,11 +68,10 @@ impl AuthService {
         ) {
             Ok(token_data) => {
                 let username = token_data.claims.sub;
-                // Optional: Prüfen, ob der Benutzer noch in unserer statischen Liste existiert
-                if self.users.iter().any(|u| u.username == username) {
-                    Some(username)
-                } else {
-                    None
+                // Prüfen, ob der Benutzer noch existiert
+                match self.user_repository.find_by_username(&username).await {
+                    Ok(Some(_)) => Some(username),
+                    _ => None,
                 }
             }
             Err(_) => None,
@@ -94,7 +82,7 @@ impl AuthService {
 impl Clone for AuthService {
     fn clone(&self) -> Self {
         Self {
-            users: self.users.clone(),
+            user_repository: self.user_repository.clone(),
             secret: self.secret.clone(),
         }
     }

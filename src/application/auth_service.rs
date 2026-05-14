@@ -1,10 +1,11 @@
-use crate::domain::user::{LoginRequest, LoginResponse};
 use crate::domain::repository::UserRepository;
+use crate::domain::user::{LoginRequest, LoginResponse, RegisterRequest, User};
+use bcrypt::{hash, verify, DEFAULT_COST};
+use chrono::Utc;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::sync::Arc;
-use serde::{Serialize, Deserialize};
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
-use chrono::Utc;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -21,7 +22,7 @@ impl AuthService {
     pub fn new(user_repository: Arc<dyn UserRepository + Send + Sync>) -> Self {
         // In Produktion sollte das Geheimnis über eine Umgebungsvariable gesetzt werden
         let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-key".to_string());
-        
+
         Self {
             user_repository,
             secret,
@@ -29,10 +30,13 @@ impl AuthService {
     }
 
     pub async fn login(&self, request: LoginRequest) -> Result<LoginResponse, Box<dyn Error>> {
-        let user = self.user_repository.find_by_username(&request.username).await?;
-        
+        let user = self
+            .user_repository
+            .find_by_username(&request.username)
+            .await?;
+
         if let Some(user) = user {
-            if user.password_hash == request.password {
+            if verify(&request.password, &user.password_hash)? {
                 // Produktionsreife Token-Generierung mit JWT
                 let expiration = Utc::now()
                     .checked_add_signed(chrono::Duration::hours(24))
@@ -50,13 +54,36 @@ impl AuthService {
                     &EncodingKey::from_secret(self.secret.as_ref()),
                 )?;
 
-                return Ok(LoginResponse {
-                    token,
-                });
+                return Ok(LoginResponse { token });
             }
         }
-        
+
         Err("Ungültiger Benutzername oder Passwort".into())
+    }
+
+    pub async fn register(&self, request: RegisterRequest) -> Result<(), Box<dyn Error>> {
+        // Prüfen, ob der Benutzer bereits existiert
+        if self
+            .user_repository
+            .find_by_username(&request.username)
+            .await?
+            .is_some()
+        {
+            return Err("Benutzername bereits vergeben".into());
+        }
+
+        // Passwort hashen
+        let password_hash = hash(request.password, DEFAULT_COST)?;
+
+        let user = User {
+            username: request.username,
+            password_hash,
+        };
+
+        // In DB speichern
+        self.user_repository.save(&user).await?;
+
+        Ok(())
     }
 
     pub async fn validate_token(&self, token: &str) -> Option<String> {

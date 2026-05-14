@@ -1,6 +1,7 @@
 use crate::domain::repository::{SessionRepository, UserRepository};
 use crate::domain::session::{Session, SessionState};
 use crate::domain::user::User;
+use bcrypt::{hash, DEFAULT_COST};
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
 use std::error::Error;
@@ -21,8 +22,10 @@ impl PostgresRepository {
             "CREATE TABLE IF NOT EXISTS users (
                 username TEXT PRIMARY KEY,
                 password_hash TEXT NOT NULL
-            )"
-        ).execute(&self.pool).await?;
+            )",
+        )
+        .execute(&self.pool)
+        .await?;
 
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS sessions (
@@ -34,20 +37,27 @@ impl PostgresRepository {
                 notes TEXT NOT NULL,
                 tags TEXT[] NOT NULL,
                 ratings JSONB
-            )"
-        ).execute(&self.pool).await?;
+            )",
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Seed default users if empty
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-            .fetch_one(&self.pool).await?;
-        
+            .fetch_one(&self.pool)
+            .await?;
+
         if count == 0 {
+            let admin_hash = hash("admin", DEFAULT_COST)?;
+            let user_hash = hash("password", DEFAULT_COST)?;
+
             sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, $2), ($3, $4)")
                 .bind("admin")
-                .bind("admin")
+                .bind(admin_hash)
                 .bind("user")
-                .bind("password")
-                .execute(&self.pool).await?;
+                .bind(user_hash)
+                .execute(&self.pool)
+                .await?;
         }
 
         Ok(())
@@ -58,10 +68,13 @@ use std::future::Future;
 use std::pin::Pin;
 
 impl SessionRepository for PostgresRepository {
-    fn save(&self, session: &Session) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
+    fn save(
+        &self,
+        session: &Session,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
         let pool = self.pool.clone();
         let session = session.clone();
-        
+
         Box::pin(async move {
             let state_str = match session.state {
                 SessionState::Running => "Running",
@@ -70,7 +83,10 @@ impl SessionRepository for PostgresRepository {
                 SessionState::Canceled => "Canceled",
             };
 
-            let ratings_json = session.ratings.as_ref().map(|r| serde_json::to_value(r).unwrap());
+            let ratings_json = session
+                .ratings
+                .as_ref()
+                .map(|r| serde_json::to_value(r).unwrap());
 
             sqlx::query(
                 "INSERT INTO sessions (description, duration_secs, start_time, state, notes, tags, ratings)
@@ -89,7 +105,9 @@ impl SessionRepository for PostgresRepository {
         })
     }
 
-    fn find_all(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
+    fn find_all(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
         let pool = self.pool.clone();
         Box::pin(async move {
             let rows = sqlx::query("SELECT description, duration_secs, start_time, state, notes, tags, ratings FROM sessions")
@@ -112,9 +130,9 @@ impl SessionRepository for PostgresRepository {
         let pool = self.pool.clone();
         Box::pin(async move {
             let rows = sqlx::query(
-                "SELECT description, duration_secs, start_time, state, notes, tags, ratings 
-                 FROM sessions 
-                 WHERE start_time >= $1 AND start_time <= $2"
+                "SELECT description, duration_secs, start_time, state, notes, tags, ratings
+                 FROM sessions
+                 WHERE start_time >= $1 AND start_time <= $2",
             )
             .bind(start)
             .bind(end)
@@ -129,7 +147,9 @@ impl SessionRepository for PostgresRepository {
         })
     }
 
-    fn init_storage(&self) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
+    fn init_storage(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
         Box::pin(async move {
             self.init_db().await?;
             Ok(())
@@ -138,20 +158,42 @@ impl SessionRepository for PostgresRepository {
 }
 
 impl UserRepository for PostgresRepository {
-    fn find_by_username(&self, username: &str) -> Pin<Box<dyn Future<Output = Result<Option<User>, Box<dyn Error>>> + Send + '_>> {
+    fn find_by_username(
+        &self,
+        username: &str,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<User>, Box<dyn Error>>> + Send + '_>> {
         let pool = self.pool.clone();
         let username = username.to_string();
-        
+
         Box::pin(async move {
-            let user = sqlx::query_as::<_, UserRecord>("SELECT username, password_hash FROM users WHERE username = $1")
-                .bind(username)
-                .fetch_optional(&pool)
-                .await?;
+            let user = sqlx::query_as::<_, UserRecord>(
+                "SELECT username, password_hash FROM users WHERE username = $1",
+            )
+            .bind(username)
+            .fetch_optional(&pool)
+            .await?;
 
             Ok::<Option<User>, Box<dyn Error>>(user.map(|u| User {
                 username: u.username,
                 password_hash: u.password_hash,
             }))
+        })
+    }
+
+    fn save(
+        &self,
+        user: &User,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
+        let pool = self.pool.clone();
+        let user = user.clone();
+
+        Box::pin(async move {
+            sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, $2) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash")
+                .bind(user.username)
+                .bind(user.password_hash)
+                .execute(&pool)
+                .await?;
+            Ok::<(), Box<dyn Error>>(())
         })
     }
 }

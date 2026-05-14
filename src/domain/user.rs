@@ -12,6 +12,12 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct LoginResponse {
     pub token: String,

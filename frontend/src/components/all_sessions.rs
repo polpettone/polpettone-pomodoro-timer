@@ -4,7 +4,7 @@ use crate::models::Session;
 use leptos::*;
 
 #[component]
-pub fn AllSessions(token: String) -> impl IntoView {
+pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl IntoView {
     let token = store_value(token);
     let (editing_session, set_editing_session) = create_signal(None::<Session>);
     let (is_open, set_is_open) = create_signal(false);
@@ -76,6 +76,7 @@ pub fn AllSessions(token: String) -> impl IntoView {
                                                                                         spawn_local(async move {
                                                                                             if let Ok(_) = delete_session(t, s_id).await {
                                                                                                 sessions.refetch();
+                                                                                                on_update.call(());
                                                                                             }
                                                                                         });
                                                                                     }
@@ -108,7 +109,10 @@ pub fn AllSessions(token: String) -> impl IntoView {
                         token=token_edit
                         session=s
                         on_close=move |_| set_editing_session.set(None)
-                        on_updated=move |_| sessions.refetch()
+                        on_updated=move |_| {
+                            sessions.refetch();
+                            on_update.call(());
+                        }
                     />
                 }
             })}

@@ -1,15 +1,15 @@
-mod models;
 mod api;
 mod auth;
 mod components;
+mod models;
 
-use leptos::*;
 use crate::api::fetch_active_sessions;
-use crate::auth::{get_token_from_storage, save_token_to_storage, clear_token_from_storage};
+use crate::auth::{clear_token_from_storage, get_token_from_storage, save_token_to_storage};
 use crate::components::active_sessions::ActiveSessions;
 use crate::components::all_sessions::AllSessions;
-use crate::components::start_session::StartSession;
 use crate::components::login::Login;
+use crate::components::start_session::StartSession;
+use leptos::*;
 
 fn main() {
     console_error_panic_hook::set_once();
@@ -33,7 +33,7 @@ fn App() -> impl IntoView {
                     <button class="logout-btn" on:click=logout>"Abmelden"</button>
                 })}
             </div>
-            
+
             {move || match token.get() {
                 Some(t) => {
                     let t_active = t.clone();
@@ -48,7 +48,7 @@ fn App() -> impl IntoView {
                             <ActiveSessions sessions=sessions />
                         </section>
                         <section class="card">
-                            <AllSessions token=t_all />
+                            <AllSessions token=t_all on_update=move |_| sessions.refetch() />
                         </section>
                     }.into_view()
                 },

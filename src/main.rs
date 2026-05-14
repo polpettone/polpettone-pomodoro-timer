@@ -4,25 +4,22 @@ mod config;
 mod date_time;
 mod domain;
 
-use crate::config::{Config, LogFormat, PersistenceMode};
-use crate::adapters::persistence::file_repository::FileSessionRepository;
-use crate::adapters::persistence::postgres_repository::PostgresRepository;
-use crate::adapters::persistence::static_user_repository::StaticUserRepository;
-use crate::adapters::persistence::CombinedRepository;
-use crate::domain::repository::SessionRepository;
-use crate::application::service::SessionService;
-use crate::application::auth_service::AuthService;
-use crate::adapters::cli::handler::handle_command;
 use crate::adapters::cli::command::Command;
+use crate::adapters::cli::handler::handle_command;
+use crate::adapters::persistence::postgres_repository::PostgresRepository;
+use crate::application::auth_service::AuthService;
+use crate::application::service::SessionService;
+use crate::config::{Config, LogFormat};
+use crate::domain::repository::SessionRepository;
 
 use dirs::home_dir;
+use sqlx::PgPool;
 use std::error::Error;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
-use sqlx::PgPool;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -40,7 +37,7 @@ struct Opts {
 fn init_logging(config: &Config) {
     let log_level = std::env::var("LOG_LEVEL")
         .unwrap_or_else(|_| config.pomodoro_config.log_config.level.clone());
-    
+
     let log_format = std::env::var("LOG_FORMAT")
         .ok()
         .and_then(|s| match s.to_lowercase().as_str() {
@@ -50,21 +47,16 @@ fn init_logging(config: &Config) {
         })
         .unwrap_or(config.pomodoro_config.log_config.format.clone());
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     let registry = tracing_subscriber::registry().with(filter);
 
     match log_format {
         LogFormat::Json => {
-            registry
-                .with(fmt::layer().json())
-                .init();
+            registry.with(fmt::layer().json()).init();
         }
         LogFormat::Line => {
-            registry
-                .with(fmt::layer())
-                .init();
+            registry.with(fmt::layer()).init();
         }
     }
 }
@@ -139,41 +131,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
     let config_path = get_config_path(opts.config);
     let config = load_config(&config_path)?;
-    
+
     init_logging(&config);
 
     let raw_session_dir = std::env::var("POMODORO_SESSION_DIR")
         .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir.clone());
     let pomodoro_session_dir = expand_tilde(raw_session_dir);
 
-    let persistence_mode = std::env::var("PERSISTENCE_MODE")
-        .ok()
-        .and_then(|s| match s.to_lowercase().as_str() {
-            "file" => Some(PersistenceMode::File),
-            "postgres" => Some(PersistenceMode::Postgres),
-            _ => None,
-        })
-        .unwrap_or(config.pomodoro_config.persistence_mode);
-
-    info!("Starting application in persistence mode: {:?}", persistence_mode);
+    info!("Starting application with Postgres persistence");
 
     let database_url = std::env::var("DATABASE_URL")
         .ok()
-        .or(config.pomodoro_config.database_url);
+        .or(config.pomodoro_config.database_url)
+        .expect("DATABASE_URL must be set (via env or config)");
 
-    let (repository, user_repository) = match persistence_mode {
-        PersistenceMode::File => {
-            let session_repo = FileSessionRepository::new(pomodoro_session_dir.clone());
-            let user_repo = Arc::new(StaticUserRepository::new());
-            (CombinedRepository::File(session_repo), user_repo as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
-        }
-        PersistenceMode::Postgres => {
-            let db_url = database_url.expect("database_url must be set for postgres mode");
-            let pool = PgPool::connect(&db_url).await?;
-            let repo = PostgresRepository::new(pool);
-            (CombinedRepository::Postgres(repo.clone()), Arc::new(repo) as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
-        }
-    };
+    let pool = PgPool::connect(&database_url).await?;
+    let repo = PostgresRepository::new(pool);
+    let repository = repo.clone();
+    let user_repository =
+        Arc::new(repo) as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>;
 
     repository.init_storage().await?;
 

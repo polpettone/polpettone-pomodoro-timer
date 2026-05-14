@@ -42,6 +42,15 @@ pub struct GenerateRequest {
     pub number: u32,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UpdateSessionRequest {
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub notes: Option<String>,
+    pub ratings: Option<crate::domain::session::SessionRatings>,
+    pub state: Option<SessionState>,
+}
+
 pub fn create_router<R: SessionRepository + Send + Sync + 'static>(
     service: SessionService<R>,
     auth_service: AuthService,
@@ -62,6 +71,8 @@ pub fn create_router<R: SessionRepository + Send + Sync + 'static>(
         .route("/sessions/start", post(start_session::<R>))
         .route("/sessions/active", get(get_active_sessions::<R>))
         .route("/sessions", get(get_sessions::<R>))
+        .route("/sessions/:id", post(update_session::<R>))
+        .route("/sessions/:id", axum::routing::delete(delete_session::<R>))
         .route("/sessions/init", post(init_session_dir::<R>))
         .route("/sessions/generate", post(generate_test_data::<R>))
         .layer(cors)
@@ -161,6 +172,77 @@ async fn get_active_sessions<R: SessionRepository + Send + Sync + 'static>(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
+}
+
+async fn update_session<R: SessionRepository + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<R>>>,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdateSessionRequest>,
+) -> Result<Json<Session>, (StatusCode, String)> {
+    let user = check_auth(&state, &headers).await?;
+    let mut sessions = state
+        .service
+        .load_sessions(user.id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let session = sessions
+        .iter_mut()
+        .find(|s| s.id == id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    if let Some(desc) = payload.description {
+        session.description = desc;
+    }
+    if let Some(tags) = payload.tags {
+        session.tags = tags;
+    }
+    if let Some(notes) = payload.notes {
+        session.notes = notes;
+    }
+    if let Some(ratings) = payload.ratings {
+        session.ratings = Some(ratings);
+    }
+    if let Some(s) = payload.state {
+        session.state = s;
+    }
+
+    state
+        .service
+        .save_session(session)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(session.clone()))
+}
+
+async fn delete_session<R: SessionRepository + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<R>>>,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    headers: HeaderMap,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let user = check_auth(&state, &headers).await?;
+    let mut sessions = state
+        .service
+        .load_sessions(user.id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let session = sessions
+        .iter_mut()
+        .find(|s| s.id == id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    session.state = SessionState::Deleted;
+
+    state
+        .service
+        .save_session(session)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
@@ -393,5 +475,62 @@ mod tests {
         let sessions_a: Vec<Session> = active_a_res.json();
         assert_eq!(sessions_a.len(), 1);
         assert_eq!(sessions_a[0].description, "User A session");
+    }
+
+    #[tokio::test]
+    async fn test_update_session() {
+        let server = setup_test_server().await;
+
+        let user = RegisterRequest {
+            username: "update_user".to_string(),
+            password: "password".to_string(),
+        };
+        server
+            .post("/register")
+            .json(&user)
+            .await
+            .assert_status_success();
+        let login: LoginResponse = server.post("/login").json(&user).await.json();
+
+        // Start session
+        let start_req = StartSessionRequest {
+            description: "Initial description".to_string(),
+            duration_minutes: 25,
+        };
+        server
+            .post("/sessions/start")
+            .add_header("Authorization", format!("Bearer {}", login.token))
+            .json(&start_req)
+            .await
+            .assert_status_success();
+
+        // Get session
+        let sessions_res = server
+            .get("/sessions/active")
+            .add_header("Authorization", format!("Bearer {}", login.token))
+            .await;
+        let sessions: Vec<Session> = sessions_res.json();
+        let session_id = sessions[0].id;
+
+        // Update session
+        let update_req = UpdateSessionRequest {
+            description: Some("Updated description".to_string()),
+            tags: Some(vec!["rust".to_string()]),
+            notes: Some("New notes".to_string()),
+            ratings: None,
+            state: None,
+        };
+
+        let update_res = server
+            .post(&format!("/sessions/{}", session_id))
+            .add_header("Authorization", format!("Bearer {}", login.token))
+            .json(&update_req)
+            .await;
+        update_res.assert_status_success();
+
+        let updated_session: Session = update_res.json();
+        assert_eq!(updated_session.description, "Updated description");
+        assert_eq!(updated_session.tags, vec!["rust".to_string()]);
+        assert_eq!(updated_session.notes, "New notes");
     }
 }

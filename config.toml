@@ -2,3 +2,7 @@
 pomodoro_session_dir = "/home/kenny/polpettone-pomodoro-timer-sessions"
 persistence_mode="postgres"
 database_url = "postgres://user:password@localhost:5432/polpettone"
+
+[pomodoro_config.log_config]
+level = "info"
+format = "line"

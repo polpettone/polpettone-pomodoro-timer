@@ -4,7 +4,7 @@ mod config;
 mod date_time;
 mod domain;
 
-use crate::config::{Config, PersistenceMode};
+use crate::config::{Config, LogFormat, PersistenceMode};
 use crate::adapters::persistence::file_repository::FileSessionRepository;
 use crate::adapters::persistence::postgres_repository::PostgresRepository;
 use crate::adapters::persistence::static_user_repository::StaticUserRepository;
@@ -22,6 +22,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
 use sqlx::PgPool;
+use tracing::info;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "pomodoro")]
@@ -32,6 +34,38 @@ struct Opts {
 
     #[structopt(subcommand)]
     cmd: Command,
+}
+
+fn init_logging(config: &Config) {
+    let log_level = std::env::var("LOG_LEVEL")
+        .unwrap_or_else(|_| config.pomodoro_config.log_config.level.clone());
+    
+    let log_format = std::env::var("LOG_FORMAT")
+        .ok()
+        .and_then(|s| match s.to_lowercase().as_str() {
+            "line" => Some(LogFormat::Line),
+            "json" => Some(LogFormat::Json),
+            _ => None,
+        })
+        .unwrap_or(config.pomodoro_config.log_config.format.clone());
+
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(log_level));
+
+    let registry = tracing_subscriber::registry().with(filter);
+
+    match log_format {
+        LogFormat::Json => {
+            registry
+                .with(fmt::layer().json())
+                .init();
+        }
+        LogFormat::Line => {
+            registry
+                .with(fmt::layer())
+                .init();
+        }
+    }
 }
 
 fn get_config_path(custom_path: Option<String>) -> PathBuf {
@@ -55,11 +89,9 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
     let config_string = match fs::read_to_string(config_path) {
         Ok(content) => content,
         Err(e) => {
-            eprintln!("Could not read config {:?} : {}", config_path, e);
-            let home_dir = home::home_dir().expect("could not determine home dir");
-            let home_str = home_dir.to_str().expect("broken");
-
             if e.kind() == ErrorKind::NotFound {
+                let home_dir = home::home_dir().expect("could not determine home dir");
+                let home_str = home_dir.to_str().expect("broken");
                 let default_config = format!(
                     r#"
     [pomodoro_config]
@@ -72,9 +104,11 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
                     fs::create_dir_all(parent)?;
                 }
                 fs::write(config_path, default_config.clone())?;
+                // We can't use tracing here yet because it's not initialized
                 eprintln!("A default config file created {:?}.", config_path);
                 default_config.to_string()
             } else {
+                eprintln!("Could not read config {:?} : {}", config_path, e);
                 return Err(Box::new(e));
             }
         }
@@ -82,7 +116,7 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
     let config: Config = match toml::from_str(&config_string) {
         Ok(cfg) => cfg,
         Err(e) => {
-            println!("Error deserialize configuration: {}", e);
+            eprintln!("Error deserialize configuration: {}", e);
             return Err(Box::new(e));
         }
     };
@@ -95,6 +129,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let opts = Opts::from_args();
     let config_path = get_config_path(opts.config);
     let config = load_config(&config_path)?;
+    
+    init_logging(&config);
 
     let pomodoro_session_dir = std::env::var("POMODORO_SESSION_DIR")
         .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir.clone());
@@ -107,6 +143,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             _ => None,
         })
         .unwrap_or(config.pomodoro_config.persistence_mode);
+
+    info!("Starting application in persistence mode: {:?}", persistence_mode);
 
     let database_url = std::env::var("DATABASE_URL")
         .ok()

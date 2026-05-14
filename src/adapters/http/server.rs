@@ -4,6 +4,7 @@ use axum::{
     Json, Router,
     http::{StatusCode, HeaderMap},
 };
+use tracing::info;
 use tower_http::cors::{Any, CorsLayer};
 use crate::application::service::SessionService;
 use crate::application::auth_service::AuthService;
@@ -66,7 +67,7 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
 
     let addr_str = format!("{}:{}", host, port);
     let addr: SocketAddr = addr_str.parse()?;
-    println!("Server running on http://{}", addr);
+    info!("Server running on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

@@ -248,6 +248,7 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
                 - ChronoDuration::minutes(minutes_ago);
 
             Session {
+                id: uuid::Uuid::new_v4(),
                 description: descriptions[rng.random_range(0..descriptions.len())].to_string(),
                 duration: Duration::from_secs(25 * 60),
                 start: start_time,

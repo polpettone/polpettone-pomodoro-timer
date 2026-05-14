@@ -1,17 +1,17 @@
-use crate::application::service::SessionService;
-use crate::application::auth_service::AuthService;
-use crate::domain::repository::SessionRepository;
 use crate::adapters::cli::command::Command;
 use crate::adapters::cli::display;
+use crate::adapters::gui;
+use crate::adapters::http::server;
 use crate::adapters::tui::app::App;
-use chrono::{Duration as ChronoDuration, Utc, NaiveDateTime};
+use crate::application::auth_service::AuthService;
+use crate::application::service::SessionService;
+use crate::domain::repository::SessionRepository;
+use crate::domain::session::{Session, SessionState};
+use chrono::{Duration as ChronoDuration, NaiveDateTime, Utc};
+use rand::Rng;
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
-use crate::domain::session::{Session, SessionState};
-use rand::Rng;
-use crate::adapters::http::server;
-use crate::adapters::gui;
 
 pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone>(
     cmd: Command,
@@ -33,7 +33,14 @@ pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone
             search_query,
             export,
         } => {
-            handle_find_sessions_in_range(session_service, start_date, end_date, search_query, export).await?;
+            handle_find_sessions_in_range(
+                session_service,
+                start_date,
+                end_date,
+                search_query,
+                export,
+            )
+            .await?;
         }
         Command::FindSessionFromToday {
             search_query,
@@ -61,7 +68,7 @@ pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone
 }
 
 fn handle_gui<R: SessionRepository + Clone + Send + 'static>(
-    session_service: &SessionService<R>
+    session_service: &SessionService<R>,
 ) -> Result<(), Box<dyn Error>> {
     gui::run(session_service.clone())?;
     Ok(())
@@ -92,11 +99,16 @@ async fn handle_tui<R: SessionRepository + Clone + Send + Sync + 'static>(
         app.run().map_err(|e| e.to_string())
     });
 
-    handle.join().unwrap().map_err(|e| Box::from(e) as Box<dyn Error>)?;
+    handle
+        .join()
+        .unwrap()
+        .map_err(|e| Box::from(e) as Box<dyn Error>)?;
     Ok(())
 }
 
-async fn handle_init_session_dir<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_init_session_dir<R: SessionRepository>(
+    session_service: &SessionService<R>,
+) -> Result<(), Box<dyn Error>> {
     println!("init session dir");
     session_service.init_session_dir().await?;
     Ok(())
@@ -112,11 +124,15 @@ async fn handle_start<R: SessionRepository>(
     println!("Duration: {} minutes", duration);
     println!("Description: {}", description);
 
-    session_service.start_session(&description, duration * 60).await?;
+    session_service
+        .start_session(&description, duration * 60)
+        .await?;
     Ok(())
 }
 
-async fn handle_active<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_active<R: SessionRepository>(
+    session_service: &SessionService<R>,
+) -> Result<(), Box<dyn Error>> {
     println!("Showing all sessions");
     match session_service.find_all_active_sessions().await {
         Ok(sessions) => {
@@ -131,7 +147,9 @@ async fn handle_active<R: SessionRepository>(session_service: &SessionService<R>
     Ok(())
 }
 
-async fn handle_watch<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_watch<R: SessionRepository>(
+    session_service: &SessionService<R>,
+) -> Result<(), Box<dyn Error>> {
     loop {
         match session_service.find_all_active_sessions().await {
             Ok(sessions) => {
@@ -173,14 +191,17 @@ async fn handle_find_sessions_in_range<R: SessionRepository>(
     search_query: Option<String>,
     export: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let parsed_start = NaiveDateTime::parse_from_str(&start_date, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| dt.and_utc());
-    let parsed_end = NaiveDateTime::parse_from_str(&end_date, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| dt.and_utc());
+    let parsed_start =
+        NaiveDateTime::parse_from_str(&start_date, "%Y-%m-%d %H:%M:%S").map(|dt| dt.and_utc());
+    let parsed_end =
+        NaiveDateTime::parse_from_str(&end_date, "%Y-%m-%d %H:%M:%S").map(|dt| dt.and_utc());
 
     match (parsed_start, parsed_end) {
         (Ok(start), Ok(end)) => {
-            match session_service.find_sessions_in_range(start, end, search_query).await {
+            match session_service
+                .find_sessions_in_range(start, end, search_query)
+                .await
+            {
                 Ok(sessions) => {
                     if export {
                         display::export_to_ascii_table(sessions)?;
@@ -205,7 +226,10 @@ async fn handle_find_today<R: SessionRepository>(
     let start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let end = now.date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-    match session_service.find_sessions_in_range(start, end, search_query).await {
+    match session_service
+        .find_sessions_in_range(start, end, search_query)
+        .await
+    {
         Ok(sessions) => {
             if export {
                 display::export_to_ascii_table(sessions)?;
@@ -228,7 +252,10 @@ async fn handle_find_yesterday<R: SessionRepository>(
     let start = yesterday.and_hms_opt(0, 0, 0).unwrap().and_utc();
     let end = yesterday.and_hms_opt(23, 59, 59).unwrap().and_utc();
 
-    match session_service.find_sessions_in_range(start, end, search_query).await {
+    match session_service
+        .find_sessions_in_range(start, end, search_query)
+        .await
+    {
         Ok(sessions) => {
             if export {
                 display::export_to_ascii_table(sessions)?;
@@ -271,6 +298,7 @@ async fn handle_generate_test_data<R: SessionRepository>(
             - ChronoDuration::minutes(minutes_ago);
 
         let session = Session {
+            id: uuid::Uuid::new_v4(),
             description: descriptions[rng.random_range(0..descriptions.len())].to_string(),
             duration: Duration::from_secs(25 * 60),
             start: start_time,

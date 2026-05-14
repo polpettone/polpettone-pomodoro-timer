@@ -6,6 +6,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -76,6 +77,7 @@ impl AuthService {
         let password_hash = hash(request.password, DEFAULT_COST)?;
 
         let user = User {
+            id: Uuid::new_v4(),
             username: request.username,
             password_hash,
         };

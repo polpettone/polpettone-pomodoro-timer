@@ -1,8 +1,9 @@
+use crate::date_time::{deserialize_human_readable, serialize_human_readable};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
-use crate::date_time::{deserialize_human_readable, serialize_human_readable};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum SessionState {
@@ -27,6 +28,7 @@ fn default_state() -> SessionState {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
+    pub id: Uuid,
     pub description: String,
     pub duration: Duration,
     #[serde(
@@ -65,7 +67,6 @@ impl Session {
             duration_since_start.num_nanoseconds().unwrap_or(0) as u32,
         )
     }
-
 
     pub fn remaining_duration(&self) -> Duration {
         let now = Utc::now();

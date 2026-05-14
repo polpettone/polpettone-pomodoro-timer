@@ -13,10 +13,12 @@ use ratatui::{
 };
 use std::{env, error::Error, fs, io, process::Command, time::Duration};
 
-use crate::domain::session::{Session, SessionRatings, SessionState};
-use crate::adapters::tui::components::{filter_bar, info_pane, keybinds, overlay_bar, session_list, zen};
+use crate::adapters::tui::components::{
+    filter_bar, info_pane, keybinds, overlay_bar, session_list, zen,
+};
 use crate::adapters::tui::events;
 use crate::domain::repository::SessionRepository;
+use crate::domain::session::{Session, SessionRatings, SessionState};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -59,7 +61,7 @@ pub struct App<R: SessionRepository> {
     pub search_input: String,
     pub tags_input: String,
     pub notes_input: String,
-    
+
     pub creation_duration: String,
     pub creation_description: String,
 
@@ -78,7 +80,7 @@ impl<R: SessionRepository> App<R> {
     pub fn new(sessions: Vec<Session>, session_dir: String, repository: R) -> App<R> {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
-        
+
         let mut app = App {
             filtered_sessions: Vec::new(),
             sessions,
@@ -143,7 +145,8 @@ impl<R: SessionRepository> App<R> {
 
     pub fn to_bottom(&mut self) {
         if !self.filtered_sessions.is_empty() {
-            self.list_state.select(Some(self.filtered_sessions.len() - 1));
+            self.list_state
+                .select(Some(self.filtered_sessions.len() - 1));
         }
     }
 
@@ -278,21 +281,25 @@ impl<R: SessionRepository> App<R> {
     }
 
     pub fn cancel_session(&mut self) -> Result<(), Box<dyn Error>> {
-         if let Some(selected_idx) = self.list_state.selected() {
+        if let Some(selected_idx) = self.list_state.selected() {
             if let Some(selected_session) = self.filtered_sessions.get_mut(selected_idx) {
                 if selected_session.state == SessionState::Running {
-                     selected_session.state = SessionState::Canceled;
-                     
-                     if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
-                         original_session.state = SessionState::Canceled;
-                     }
-                     
-                     let handle = tokio::runtime::Handle::current();
-                     handle.block_on(self.repository.save(selected_session))?;
+                    selected_session.state = SessionState::Canceled;
+
+                    if let Some(original_session) = self
+                        .sessions
+                        .iter_mut()
+                        .find(|s| s.start == selected_session.start)
+                    {
+                        original_session.state = SessionState::Canceled;
+                    }
+
+                    let handle = tokio::runtime::Handle::current();
+                    handle.block_on(self.repository.save(selected_session))?;
                 }
             }
-         }
-          Ok(())
+        }
+        Ok(())
     }
 
     pub fn delete_session(&mut self) -> Result<(), Box<dyn Error>> {
@@ -301,7 +308,11 @@ impl<R: SessionRepository> App<R> {
                 let mut deleted_session = selected_session.clone();
                 deleted_session.state = SessionState::Deleted;
 
-                if let Some(original_session) = self.sessions.iter_mut().find(|s| s.start == selected_session.start) {
+                if let Some(original_session) = self
+                    .sessions
+                    .iter_mut()
+                    .find(|s| s.start == selected_session.start)
+                {
                     original_session.state = SessionState::Deleted;
                 }
 
@@ -318,6 +329,7 @@ impl<R: SessionRepository> App<R> {
             if let Some(selected_session) = self.filtered_sessions.get(selected_idx) {
                 let start = Utc::now();
                 let new_session = Session {
+                    id: uuid::Uuid::new_v4(),
                     description: selected_session.description.clone(),
                     duration: selected_session.duration,
                     start,
@@ -396,9 +408,10 @@ impl<R: SessionRepository> App<R> {
     pub fn create_session(&mut self) -> Result<(), Box<dyn Error>> {
         let duration_mins: u64 = self.creation_duration.trim().parse().unwrap_or(25);
         let description = self.creation_description.trim().to_string();
-        
+
         let start = Utc::now();
         let session = Session {
+            id: uuid::Uuid::new_v4(),
             description,
             duration: Duration::from_secs(duration_mins * 60),
             start,
@@ -407,13 +420,13 @@ impl<R: SessionRepository> App<R> {
             state: SessionState::Running,
             ratings: None,
         };
-        
+
         let handle = tokio::runtime::Handle::current();
         handle.block_on(self.repository.save(&session))?;
-        
+
         self.sessions.push(session);
         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
-        
+
         self.filter_sessions();
         Ok(())
     }
@@ -428,7 +441,9 @@ impl<R: SessionRepository> App<R> {
         loop {
             let mut changed = false;
             for session in self.sessions.iter_mut() {
-                if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
+                if session.state == SessionState::Running
+                    && session.remaining_duration().as_secs() == 0
+                {
                     session.state = SessionState::Done;
                     let handle = tokio::runtime::Handle::current();
                     let _ = handle.block_on(self.repository.save(session));
@@ -464,37 +479,40 @@ impl<R: SessionRepository> App<R> {
 
 fn ui<R: SessionRepository>(f: &mut Frame, app: &mut App<R>) {
     if app.mode == Mode::Zen {
-        let running_session = app.sessions.iter().find(|s| s.state == SessionState::Running);
+        let running_session = app
+            .sessions
+            .iter()
+            .find(|s| s.state == SessionState::Running);
         zen::render(f, running_session);
         return;
     }
 
     let constraints = if let Mode::Creation(_) = app.mode {
         vec![
-            Constraint::Length(3), 
-            Constraint::Length(3), 
-            Constraint::Min(0),    
-            Constraint::Length(3), 
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
         ]
     } else if app.mode == Mode::DeleteConfirm {
         vec![
-            Constraint::Length(3), 
-            Constraint::Length(3), 
-            Constraint::Min(0),    
-            Constraint::Length(3), 
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
         ]
     } else if app.mode == Mode::FastFilter {
         vec![
-            Constraint::Length(3), 
-            Constraint::Min(0),    
-            Constraint::Length(3), 
-            Constraint::Length(3), 
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
+            Constraint::Length(3),
         ]
     } else {
         vec![
-            Constraint::Length(3), 
-            Constraint::Min(0),    
-            Constraint::Length(3), 
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
         ]
     };
 
@@ -505,15 +523,16 @@ fn ui<R: SessionRepository>(f: &mut Frame, app: &mut App<R>) {
         .split(f.area());
 
     let top_chunk = chunks[0];
-    let (middle_chunk, main_content_chunk, fast_filter_chunk, keybinds_chunk) = if let Mode::Creation(_) = app.mode {
-        (Some(chunks[1]), chunks[2], None, chunks[3])
-    } else if app.mode == Mode::DeleteConfirm {
-        (Some(chunks[1]), chunks[2], None, chunks[3])
-    } else if app.mode == Mode::FastFilter {
-        (None, chunks[1], Some(chunks[2]), chunks[3])
-    } else {
-        (None, chunks[1], None, chunks[2])
-    };
+    let (middle_chunk, main_content_chunk, fast_filter_chunk, keybinds_chunk) =
+        if let Mode::Creation(_) = app.mode {
+            (Some(chunks[1]), chunks[2], None, chunks[3])
+        } else if app.mode == Mode::DeleteConfirm {
+            (Some(chunks[1]), chunks[2], None, chunks[3])
+        } else if app.mode == Mode::FastFilter {
+            (None, chunks[1], Some(chunks[2]), chunks[3])
+        } else {
+            (None, chunks[1], None, chunks[2])
+        };
 
     // --- Filter Bar ---
     filter_bar::render(f, top_chunk, app);
@@ -527,7 +546,7 @@ fn ui<R: SessionRepository>(f: &mut Frame, app: &mut App<R>) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(main_content_chunk);
-    
+
     let list_area = content_chunks[0];
     let right_pane_area = content_chunks[1];
 
@@ -536,7 +555,7 @@ fn ui<R: SessionRepository>(f: &mut Frame, app: &mut App<R>) {
 
     // --- Info Pane (Ratings, Tags, Notes) ---
     info_pane::render(f, right_pane_area, app);
-    
+
     // --- Keybinds & Fast Filter ---
     if let Some(chunk) = fast_filter_chunk {
         f.render_widget(keybinds::render_fast_filter(), chunk);

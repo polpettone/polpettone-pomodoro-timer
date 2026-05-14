@@ -1,11 +1,13 @@
 use crate::domain::repository::{SessionRepository, UserRepository};
-use crate::domain::session::{Session, SessionState};
+use crate::domain::session::Session;
 use crate::domain::user::User;
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
 use std::error::Error;
-use std::time::Duration;
+use std::future::Future;
+use std::pin::Pin;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct PostgresRepository {
@@ -18,25 +20,27 @@ impl PostgresRepository {
     }
 
     pub async fn init_db(&self) -> Result<(), Box<dyn Error>> {
+        // Create users table with JSONB
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL
+                id UUID PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                data JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                modified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )",
         )
         .execute(&self.pool)
         .await?;
 
+        // Create sessions table with JSONB
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS sessions (
-                id SERIAL PRIMARY KEY,
-                description TEXT NOT NULL,
-                duration_secs BIGINT NOT NULL,
+                id UUID PRIMARY KEY,
                 start_time TIMESTAMPTZ NOT NULL,
-                state TEXT NOT NULL,
-                notes TEXT NOT NULL,
-                tags TEXT[] NOT NULL,
-                ratings JSONB
+                data JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                modified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )",
         )
         .execute(&self.pool)
@@ -51,21 +55,25 @@ impl PostgresRepository {
             let admin_hash = hash("admin", DEFAULT_COST)?;
             let user_hash = hash("password", DEFAULT_COST)?;
 
-            sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, $2), ($3, $4)")
-                .bind("admin")
-                .bind(admin_hash)
-                .bind("user")
-                .bind(user_hash)
-                .execute(&self.pool)
-                .await?;
+            let admin = User {
+                id: Uuid::new_v4(),
+                username: "admin".to_string(),
+                password_hash: admin_hash,
+            };
+
+            let standard_user = User {
+                id: Uuid::new_v4(),
+                username: "user".to_string(),
+                password_hash: user_hash,
+            };
+
+            UserRepository::save(self, &admin).await?;
+            UserRepository::save(self, &standard_user).await?;
         }
 
         Ok(())
     }
 }
-
-use std::future::Future;
-use std::pin::Pin;
 
 impl SessionRepository for PostgresRepository {
     fn save(
@@ -76,29 +84,18 @@ impl SessionRepository for PostgresRepository {
         let session = session.clone();
 
         Box::pin(async move {
-            let state_str = match session.state {
-                SessionState::Running => "Running",
-                SessionState::Done => "Done",
-                SessionState::Deleted => "Deleted",
-                SessionState::Canceled => "Canceled",
-            };
-
-            let ratings_json = session
-                .ratings
-                .as_ref()
-                .map(|r| serde_json::to_value(r).unwrap());
+            let data = serde_json::to_value(&session)?;
 
             sqlx::query(
-                "INSERT INTO sessions (description, duration_secs, start_time, state, notes, tags, ratings)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)"
+                "INSERT INTO sessions (id, start_time, data, modified_at)
+                 VALUES ($1, $2, $3, NOW())
+                 ON CONFLICT (id) DO UPDATE SET
+                    data = EXCLUDED.data,
+                    modified_at = NOW()",
             )
-            .bind(session.description)
-            .bind(session.duration.as_secs() as i64)
+            .bind(session.id)
             .bind(session.start)
-            .bind(state_str)
-            .bind(session.notes)
-            .bind(session.tags)
-            .bind(ratings_json)
+            .bind(data)
             .execute(&pool)
             .await?;
             Ok::<(), Box<dyn Error>>(())
@@ -110,13 +107,15 @@ impl SessionRepository for PostgresRepository {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
         let pool = self.pool.clone();
         Box::pin(async move {
-            let rows = sqlx::query("SELECT description, duration_secs, start_time, state, notes, tags, ratings FROM sessions")
+            let rows = sqlx::query("SELECT data FROM sessions ORDER BY start_time DESC")
                 .fetch_all(&pool)
                 .await?;
 
             let mut sessions = Vec::new();
             for row in rows {
-                sessions.push(row_to_session(&row));
+                let data: serde_json::Value = row.get("data");
+                let session: Session = serde_json::from_value(data)?;
+                sessions.push(session);
             }
             Ok::<Vec<Session>, Box<dyn Error>>(sessions)
         })
@@ -130,9 +129,9 @@ impl SessionRepository for PostgresRepository {
         let pool = self.pool.clone();
         Box::pin(async move {
             let rows = sqlx::query(
-                "SELECT description, duration_secs, start_time, state, notes, tags, ratings
-                 FROM sessions
-                 WHERE start_time >= $1 AND start_time <= $2",
+                "SELECT data FROM sessions
+                 WHERE start_time >= $1 AND start_time <= $2
+                 ORDER BY start_time DESC",
             )
             .bind(start)
             .bind(end)
@@ -141,7 +140,9 @@ impl SessionRepository for PostgresRepository {
 
             let mut sessions = Vec::new();
             for row in rows {
-                sessions.push(row_to_session(&row));
+                let data: serde_json::Value = row.get("data");
+                let session: Session = serde_json::from_value(data)?;
+                sessions.push(session);
             }
             Ok::<Vec<Session>, Box<dyn Error>>(sessions)
         })
@@ -166,17 +167,18 @@ impl UserRepository for PostgresRepository {
         let username = username.to_string();
 
         Box::pin(async move {
-            let user = sqlx::query_as::<_, UserRecord>(
-                "SELECT username, password_hash FROM users WHERE username = $1",
-            )
-            .bind(username)
-            .fetch_optional(&pool)
-            .await?;
+            let row = sqlx::query("SELECT data FROM users WHERE username = $1")
+                .bind(username)
+                .fetch_optional(&pool)
+                .await?;
 
-            Ok::<Option<User>, Box<dyn Error>>(user.map(|u| User {
-                username: u.username,
-                password_hash: u.password_hash,
-            }))
+            if let Some(row) = row {
+                let data: serde_json::Value = row.get("data");
+                let user: User = serde_json::from_value(data)?;
+                Ok(Some(user))
+            } else {
+                Ok(None)
+            }
         })
     }
 
@@ -188,41 +190,22 @@ impl UserRepository for PostgresRepository {
         let user = user.clone();
 
         Box::pin(async move {
-            sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, $2) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash")
-                .bind(user.username)
-                .bind(user.password_hash)
-                .execute(&pool)
-                .await?;
+            let data = serde_json::to_value(&user)?;
+
+            sqlx::query(
+                "INSERT INTO users (id, username, data, modified_at)
+                 VALUES ($1, $2, $3, NOW())
+                 ON CONFLICT (id) DO UPDATE SET
+                    username = EXCLUDED.username,
+                    data = EXCLUDED.data,
+                    modified_at = NOW()",
+            )
+            .bind(user.id)
+            .bind(&user.username)
+            .bind(data)
+            .execute(&pool)
+            .await?;
             Ok::<(), Box<dyn Error>>(())
         })
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct UserRecord {
-    username: String,
-    password_hash: String,
-}
-
-fn row_to_session(row: &sqlx::postgres::PgRow) -> Session {
-    let state_str: String = row.get("state");
-    let state = match state_str.as_str() {
-        "Running" => SessionState::Running,
-        "Deleted" => SessionState::Deleted,
-        "Canceled" => SessionState::Canceled,
-        _ => SessionState::Done,
-    };
-
-    let ratings_json: Option<serde_json::Value> = row.get("ratings");
-    let ratings = ratings_json.map(|v| serde_json::from_value(v).unwrap());
-
-    Session {
-        description: row.get("description"),
-        duration: Duration::from_secs(row.get::<i64, _>("duration_secs") as u64),
-        start: row.get("start_time"),
-        tags: row.get("tags"),
-        notes: row.get("notes"),
-        state,
-        ratings,
     }
 }

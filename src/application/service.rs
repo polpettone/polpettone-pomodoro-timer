@@ -1,11 +1,12 @@
+use crate::date_time::duration_in_minutes;
 use crate::domain::repository::SessionRepository;
 use crate::domain::session::{Session, SessionState};
 use chrono::{DateTime, Utc};
 use std::error::Error;
-use std::time::Duration;
-use std::io::Write;
 use std::fs::OpenOptions;
-use crate::date_time::duration_in_minutes;
+use std::io::Write;
+use std::time::Duration;
+use uuid::Uuid;
 
 pub struct SessionService<R: SessionRepository> {
     repository: R,
@@ -23,7 +24,10 @@ impl<R: SessionRepository + Clone> Clone for SessionService<R> {
 
 impl<R: SessionRepository> SessionService<R> {
     pub fn new(repository: R, session_dir: String) -> Self {
-        Self { repository, session_dir }
+        Self {
+            repository,
+            session_dir,
+        }
     }
 
     pub async fn start_session(
@@ -34,6 +38,7 @@ impl<R: SessionRepository> SessionService<R> {
         let start_date = Utc::now();
 
         let session = Session {
+            id: Uuid::new_v4(),
             description: description.to_string(),
             duration: Duration::from_secs(duration_seconds),
             start: start_date,
@@ -106,17 +111,21 @@ impl<R: SessionRepository> SessionService<R> {
         range_end: DateTime<Utc>,
         search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn Error>> {
-        let sessions = self.repository.find_in_range(range_start, range_end).await?;
-        
+        let sessions = self
+            .repository
+            .find_in_range(range_start, range_end)
+            .await?;
+
         let filtered = if let Some(query) = search_query {
             let query = query.to_lowercase();
-            sessions.into_iter()
+            sessions
+                .into_iter()
                 .filter(|s| s.description.to_lowercase().contains(&query))
                 .collect()
         } else {
             sessions
         };
-        
+
         Ok(filtered)
     }
 

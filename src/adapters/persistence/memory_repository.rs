@@ -29,7 +29,11 @@ impl SessionRepository for InMemorySessionRepository {
         let session = session.clone();
         Box::pin(async move {
             let mut sessions = sessions.lock().map_err(|e| e.to_string())?;
-            sessions.push(session);
+            if let Some(existing) = sessions.iter_mut().find(|s| s.id == session.id) {
+                *existing = session;
+            } else {
+                sessions.push(session);
+            }
             Ok(())
         })
     }
@@ -103,7 +107,7 @@ impl UserRepository for InMemoryUserRepository {
         let user = user.clone();
         Box::pin(async move {
             let mut users = users.lock().map_err(|e| e.to_string())?;
-            if let Some(existing) = users.iter_mut().find(|u| u.username == user.username) {
+            if let Some(existing) = users.iter_mut().find(|u| u.id == user.id) {
                 *existing = user;
             } else {
                 users.push(user);

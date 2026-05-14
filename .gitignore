@@ -1,6 +1,7 @@
 /target
 /test-data
-/.idea 
+/.idea
 /.junie
 /frontend/dist
 .env
+.obsidian/

@@ -270,14 +270,15 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::persistence::memory_repository::InMemorySessionRepository;
-    use crate::adapters::persistence::static_user_repository::StaticUserRepository;
+    use crate::adapters::persistence::memory_repository::{
+        InMemorySessionRepository, InMemoryUserRepository,
+    };
     use crate::domain::user::{LoginRequest, LoginResponse, RegisterRequest};
     use axum_test::TestServer;
 
     async fn setup_test_server() -> TestServer {
         let session_repo = InMemorySessionRepository::new();
-        let user_repo = Arc::new(StaticUserRepository::new());
+        let user_repo = Arc::new(InMemoryUserRepository::new());
         let session_service = SessionService::new(session_repo, "test_dir".to_string());
         let auth_service = AuthService::new(user_repo);
 

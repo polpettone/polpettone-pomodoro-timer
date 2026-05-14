@@ -1,5 +1,6 @@
-use crate::domain::repository::SessionRepository;
+use crate::domain::repository::{SessionRepository, UserRepository};
 use crate::domain::session::Session;
+use crate::domain::user::User;
 use chrono::{DateTime, Utc};
 use std::error::Error;
 use std::future::Future;
@@ -64,5 +65,50 @@ impl SessionRepository for InMemorySessionRepository {
         &self,
     ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
         Box::pin(async move { Ok(()) })
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct InMemoryUserRepository {
+    users: Arc<Mutex<Vec<User>>>,
+}
+
+impl InMemoryUserRepository {
+    pub fn new() -> Self {
+        Self {
+            users: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+}
+
+impl UserRepository for InMemoryUserRepository {
+    fn find_by_username(
+        &self,
+        username: &str,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<User>, Box<dyn Error>>> + Send + '_>> {
+        let username = username.to_string();
+        let users = self.users.clone();
+        Box::pin(async move {
+            let users = users.lock().map_err(|e| e.to_string())?;
+            let user = users.iter().find(|u| u.username == username).cloned();
+            Ok(user)
+        })
+    }
+
+    fn save(
+        &self,
+        user: &User,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>> {
+        let users = self.users.clone();
+        let user = user.clone();
+        Box::pin(async move {
+            let mut users = users.lock().map_err(|e| e.to_string())?;
+            if let Some(existing) = users.iter_mut().find(|u| u.username == user.username) {
+                *existing = user;
+            } else {
+                users.push(user);
+            }
+            Ok(())
+        })
     }
 }

@@ -60,6 +60,7 @@ impl<R: SessionRepository> SessionService<R> {
     }
 
     pub async fn load_sessions(&self, user_id: Uuid) -> Result<Vec<Session>, Box<dyn Error>> {
+        self.cleanup_expired_sessions_internal(user_id).await?;
         self.repository.find_all(user_id).await
     }
 
@@ -79,6 +80,7 @@ impl<R: SessionRepository> SessionService<R> {
         &self,
         user_id: Uuid,
     ) -> Result<Vec<Session>, Box<dyn Error>> {
+        self.cleanup_expired_sessions_internal(user_id).await?;
         let sessions = self.repository.find_all(user_id).await?;
         let now = Utc::now();
         let active_sessions = sessions
@@ -117,6 +119,7 @@ impl<R: SessionRepository> SessionService<R> {
         range_end: DateTime<Utc>,
         search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn Error>> {
+        self.cleanup_expired_sessions_internal(user_id).await?;
         let sessions = self
             .repository
             .find_in_range(user_id, range_start, range_end)
@@ -136,6 +139,16 @@ impl<R: SessionRepository> SessionService<R> {
     }
 
     pub async fn cleanup_expired_sessions(&self, user_id: Uuid) -> Result<(), Box<dyn Error>> {
+        if self.cleanup_expired_sessions_internal(user_id).await? {
+            self.update_pomodoro_status(user_id).await?;
+        }
+        Ok(())
+    }
+
+    async fn cleanup_expired_sessions_internal(
+        &self,
+        user_id: Uuid,
+    ) -> Result<bool, Box<dyn Error>> {
         let mut sessions = self.repository.find_all(user_id).await?;
         let now = Utc::now();
         let mut changed = false;
@@ -146,9 +159,6 @@ impl<R: SessionRepository> SessionService<R> {
                 changed = true;
             }
         }
-        if changed {
-            self.update_pomodoro_status(user_id).await?;
-        }
-        Ok(())
+        Ok(changed)
     }
 }

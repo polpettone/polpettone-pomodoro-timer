@@ -441,6 +441,7 @@ impl<R: SessionRepository> App<R> {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        use chrono::Utc;
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -448,10 +449,11 @@ impl<R: SessionRepository> App<R> {
         let mut terminal = Terminal::new(backend)?;
 
         loop {
+            // Check for finished sessions
             let mut changed = false;
+            let now = Utc::now();
             for session in self.sessions.iter_mut() {
-                if session.state == SessionState::Running
-                    && session.remaining_duration().as_secs() == 0
+                if session.state == SessionState::Running && session.start + session.duration <= now
                 {
                     session.state = SessionState::Done;
                     let handle = tokio::runtime::Handle::current();
@@ -459,6 +461,7 @@ impl<R: SessionRepository> App<R> {
                     changed = true;
                 }
             }
+
             if changed {
                 self.filter_sessions();
             }

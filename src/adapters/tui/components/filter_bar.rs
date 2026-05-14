@@ -4,8 +4,9 @@ use ratatui::{
     Frame,
 };
 use crate::adapters::tui::app::{App, InputField, Mode};
+use crate::domain::repository::SessionRepository;
 
-pub fn render(f: &mut Frame, area: Rect, app: &App) {
+pub fn render<R: SessionRepository>(f: &mut Frame, area: Rect, app: &App<R>) {
     let top_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -39,7 +40,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(search_input, search_chunk);
 }
 
-pub fn get_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
+pub fn get_cursor_position<R: SessionRepository>(area: Rect, app: &App<R>) -> Option<(u16, u16)> {
     let top_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())

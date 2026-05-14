@@ -9,6 +9,7 @@ use crate::adapters::persistence::file_repository::FileSessionRepository;
 use crate::adapters::persistence::postgres_repository::PostgresRepository;
 use crate::adapters::persistence::static_user_repository::StaticUserRepository;
 use crate::adapters::persistence::CombinedRepository;
+use crate::domain::repository::SessionRepository;
 use crate::application::service::SessionService;
 use crate::application::auth_service::AuthService;
 use crate::adapters::cli::handler::handle_command;
@@ -123,6 +124,15 @@ fn load_config(config_path: &PathBuf) -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
+fn expand_tilde(path: String) -> String {
+    if path.starts_with("~/") {
+        if let Some(home) = home_dir() {
+            return path.replacen("~", &home.to_string_lossy(), 1);
+        }
+    }
+    path
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
@@ -132,8 +142,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     
     init_logging(&config);
 
-    let pomodoro_session_dir = std::env::var("POMODORO_SESSION_DIR")
+    let raw_session_dir = std::env::var("POMODORO_SESSION_DIR")
         .unwrap_or_else(|_| config.pomodoro_config.pomodoro_session_dir.clone());
+    let pomodoro_session_dir = expand_tilde(raw_session_dir);
 
     let persistence_mode = std::env::var("PERSISTENCE_MODE")
         .ok()
@@ -160,10 +171,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let db_url = database_url.expect("database_url must be set for postgres mode");
             let pool = PgPool::connect(&db_url).await?;
             let repo = PostgresRepository::new(pool);
-            repo.init_db().await?;
             (CombinedRepository::Postgres(repo.clone()), Arc::new(repo) as Arc<dyn crate::domain::repository::UserRepository + Send + Sync>)
         }
     };
+
+    repository.init_storage().await?;
 
     let session_service = SessionService::new(repository, pomodoro_session_dir);
     let auth_service = AuthService::new(user_repository);

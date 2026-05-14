@@ -17,7 +17,6 @@ use crate::domain::session::{Session, SessionRatings, SessionState};
 use crate::adapters::tui::components::{filter_bar, info_pane, keybinds, overlay_bar, session_list, zen};
 use crate::adapters::tui::events;
 use crate::domain::repository::SessionRepository;
-use crate::adapters::persistence::file_repository::FileSessionRepository;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InputField {
@@ -53,7 +52,7 @@ pub enum Mode {
     PendingG,
 }
 
-pub struct App {
+pub struct App<R: SessionRepository> {
     pub sessions: Vec<Session>,
     pub filtered_sessions: Vec<Session>,
     pub date_input: String,
@@ -72,25 +71,14 @@ pub struct App {
     pub mode: Mode,
     pub list_state: ListState,
     pub session_dir: String,
+    pub repository: R,
 }
 
-impl App {
-    pub fn new(sessions: Vec<Session>, session_dir: String) -> App {
+impl<R: SessionRepository> App<R> {
+    pub fn new(sessions: Vec<Session>, session_dir: String, repository: R) -> App<R> {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
         
-        for session in sessions.iter_mut() {
-            if session.state == SessionState::Running {
-                let remaining = session.remaining_duration();
-                if remaining.as_secs() == 0 {
-                    session.state = SessionState::Done;
-                    let repo = FileSessionRepository::new(session_dir.clone());
-                    let handle = tokio::runtime::Handle::current();
-                    let _ = handle.block_on(repo.save(session));
-                }
-            }
-        }
-
         let mut app = App {
             filtered_sessions: Vec::new(),
             sessions,
@@ -107,6 +95,7 @@ impl App {
             mode: Mode::Navigation,
             list_state: ListState::default(),
             session_dir,
+            repository,
         };
 
         app.filter_sessions();
@@ -235,7 +224,7 @@ impl App {
                 }
 
                 let handle = tokio::runtime::Handle::current();
-                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
+                handle.block_on(self.repository.save(selected_session))?;
             }
         }
         Ok(())
@@ -256,7 +245,7 @@ impl App {
                 }
 
                 let handle = tokio::runtime::Handle::current();
-                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
+                handle.block_on(self.repository.save(selected_session))?;
             }
         }
         Ok(())
@@ -282,7 +271,7 @@ impl App {
                 }
 
                 let handle = tokio::runtime::Handle::current();
-                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
+                handle.block_on(self.repository.save(selected_session))?;
             }
         }
         Ok(())
@@ -299,7 +288,7 @@ impl App {
                      }
                      
                      let handle = tokio::runtime::Handle::current();
-                     handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(selected_session))?;
+                     handle.block_on(self.repository.save(selected_session))?;
                 }
             }
          }
@@ -317,7 +306,7 @@ impl App {
                 }
 
                 let handle = tokio::runtime::Handle::current();
-                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&deleted_session))?;
+                handle.block_on(self.repository.save(&deleted_session))?;
                 self.filter_sessions();
             }
         }
@@ -339,7 +328,7 @@ impl App {
                 };
 
                 let handle = tokio::runtime::Handle::current();
-                handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&new_session))?;
+                handle.block_on(self.repository.save(&new_session))?;
                 self.sessions.push(new_session);
                 self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
                 self.filter_sessions();
@@ -393,7 +382,7 @@ impl App {
                         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
                         let handle = tokio::runtime::Handle::current();
-                        handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&edited_session))?;
+                        handle.block_on(self.repository.save(&edited_session))?;
 
                         self.filter_sessions();
                     }
@@ -420,7 +409,7 @@ impl App {
         };
         
         let handle = tokio::runtime::Handle::current();
-        handle.block_on(FileSessionRepository::new(self.session_dir.clone()).save(&session))?;
+        handle.block_on(self.repository.save(&session))?;
         
         self.sessions.push(session);
         self.sessions.sort_by(|a, b| b.start.cmp(&a.start));
@@ -441,9 +430,8 @@ impl App {
             for session in self.sessions.iter_mut() {
                 if session.state == SessionState::Running && session.remaining_duration().as_secs() == 0 {
                     session.state = SessionState::Done;
-                    let repo = FileSessionRepository::new(self.session_dir.clone());
                     let handle = tokio::runtime::Handle::current();
-                    let _ = handle.block_on(repo.save(session));
+                    let _ = handle.block_on(self.repository.save(session));
                     changed = true;
                 }
             }
@@ -474,7 +462,7 @@ impl App {
     }
 }
 
-fn ui(f: &mut Frame, app: &mut App) {
+fn ui<R: SessionRepository>(f: &mut Frame, app: &mut App<R>) {
     if app.mode == Mode::Zen {
         let running_session = app.sessions.iter().find(|s| s.state == SessionState::Running);
         zen::render(f, running_session);

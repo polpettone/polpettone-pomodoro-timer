@@ -6,8 +6,9 @@ use ratatui::{
 };
 use crate::adapters::tui::app::{App, Mode, RatingField};
 use crate::adapters::tui::components::ratings;
+use crate::domain::repository::SessionRepository;
 
-pub fn render(f: &mut Frame, area: Rect, app: &App) {
+pub fn render<R: SessionRepository>(f: &mut Frame, area: Rect, app: &App<R>) {
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -118,7 +119,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(notes_widget, notes_chunk);
 }
 
-pub fn get_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
+pub fn get_cursor_position<R: SessionRepository>(area: Rect, app: &App<R>) -> Option<(u16, u16)> {
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(6), Constraint::Percentage(40), Constraint::Min(5)].as_ref())

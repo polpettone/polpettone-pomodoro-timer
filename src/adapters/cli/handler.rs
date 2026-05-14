@@ -77,12 +77,22 @@ async fn handle_server<R: SessionRepository + Send + Sync + 'static + Clone>(
     Ok(())
 }
 
-async fn handle_tui<R: SessionRepository>(session_service: &SessionService<R>) -> Result<(), Box<dyn Error>> {
+async fn handle_tui<R: SessionRepository + Clone + Send + Sync + 'static>(
+    session_service: &SessionService<R>,
+) -> Result<(), Box<dyn Error>> {
+    session_service.cleanup_expired_sessions().await?;
     let sessions = session_service.load_sessions().await?;
-    // This is a bit tricky since App currently expects a String dir. 
-    // We'll fix App later when moving TUI to adapters.
-    let mut app = App::new(sessions, session_service.pomodoro_session_dir_clone());
-    app.run()?;
+    let repository = session_service.repository().clone();
+    let session_dir = session_service.pomodoro_session_dir_clone();
+
+    let tokio_handle = tokio::runtime::Handle::current();
+    let handle = thread::spawn(move || {
+        let _guard = tokio_handle.enter();
+        let mut app = App::new(sessions, session_dir, repository);
+        app.run().map_err(|e| e.to_string())
+    });
+
+    handle.join().unwrap().map_err(|e| Box::from(e) as Box<dyn Error>)?;
     Ok(())
 }
 

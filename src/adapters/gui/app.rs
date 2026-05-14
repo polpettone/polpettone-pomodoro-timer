@@ -42,9 +42,9 @@ pub fn run<R: SessionRepository + Send + 'static>(
         *rx_guard = Some(data_rx);
     }
 
+    let handle = tokio::runtime::Handle::current();
     // Service thread
     std::thread::spawn(move || {
-        let handle = tokio::runtime::Handle::current();
         loop {
             // Check for commands
             while let Ok(cmd) = cmd_rx.try_recv() {

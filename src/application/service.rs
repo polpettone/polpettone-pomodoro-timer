@@ -60,6 +60,10 @@ impl<R: SessionRepository> SessionService<R> {
         self.repository.save(session).await
     }
 
+    pub fn repository(&self) -> &R {
+        &self.repository
+    }
+
     pub fn pomodoro_session_dir_clone(&self) -> String {
         self.session_dir.clone()
     }
@@ -114,5 +118,22 @@ impl<R: SessionRepository> SessionService<R> {
         };
         
         Ok(filtered)
+    }
+
+    pub async fn cleanup_expired_sessions(&self) -> Result<(), Box<dyn Error>> {
+        let mut sessions = self.repository.find_all().await?;
+        let now = Utc::now();
+        let mut changed = false;
+        for session in sessions.iter_mut() {
+            if session.state == SessionState::Running && session.start + session.duration <= now {
+                session.state = SessionState::Done;
+                self.repository.save(session).await?;
+                changed = true;
+            }
+        }
+        if changed {
+            self.update_pomodoro_status().await?;
+        }
+        Ok(())
     }
 }

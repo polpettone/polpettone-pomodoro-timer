@@ -5,10 +5,11 @@ use std::error::Error;
 use std::io::Stdout;
 
 use super::app::{App, CreationField, InputField, Mode, RatingField};
+use crate::domain::repository::SessionRepository;
 
-pub fn handle_key_event(
+pub fn handle_key_event<R: SessionRepository>(
     key: KeyEvent,
-    app: &mut App,
+    app: &mut App<R>,
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 ) -> Result<bool, Box<dyn Error>> {
     match &app.mode {

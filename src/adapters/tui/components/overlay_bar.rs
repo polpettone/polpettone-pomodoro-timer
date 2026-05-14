@@ -5,8 +5,9 @@ use ratatui::{
     Frame,
 };
 use crate::adapters::tui::app::{App, Mode, CreationField};
+use crate::domain::repository::SessionRepository;
 
-pub fn render(f: &mut Frame, area: Rect, app: &App) {
+pub fn render<R: SessionRepository>(f: &mut Frame, area: Rect, app: &App<R>) {
     if let Mode::Creation(ref field) = app.mode {
          let creation_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -39,7 +40,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-pub fn get_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
+pub fn get_cursor_position<R: SessionRepository>(area: Rect, app: &App<R>) -> Option<(u16, u16)> {
     let creation_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())

@@ -1,5 +1,6 @@
 use crate::domain::session::SessionState;
 use crate::adapters::tui::app::App;
+use crate::domain::repository::SessionRepository;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -8,7 +9,7 @@ use ratatui::{
 };
 use std::time::Duration;
 
-pub fn render(f: &mut Frame, area: Rect, app: &mut App) {
+pub fn render<R: SessionRepository>(f: &mut Frame, area: Rect, app: &mut App<R>) {
     let list_area_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())

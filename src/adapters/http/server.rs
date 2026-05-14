@@ -42,12 +42,10 @@ pub struct GenerateRequest {
     pub number: u32,
 }
 
-pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
+pub fn create_router<R: SessionRepository + Send + Sync + 'static>(
     service: SessionService<R>,
     auth_service: AuthService,
-    host: String,
-    port: u16,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Router {
     let state = Arc::new(AppState {
         service,
         auth_service,
@@ -58,7 +56,7 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
+    Router::new()
         .route("/login", post(login::<R>))
         .route("/register", post(register::<R>))
         .route("/sessions/start", post(start_session::<R>))
@@ -67,7 +65,16 @@ pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
         .route("/sessions/init", post(init_session_dir::<R>))
         .route("/sessions/generate", post(generate_test_data::<R>))
         .layer(cors)
-        .with_state(state);
+        .with_state(state)
+}
+
+pub async fn run_server<R: SessionRepository + Send + Sync + 'static>(
+    service: SessionService<R>,
+    auth_service: AuthService,
+    host: String,
+    port: u16,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = create_router(service, auth_service);
 
     let addr_str = format!("{}:{}", host, port);
     let addr: SocketAddr = addr_str.parse()?;
@@ -258,4 +265,70 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
     }
 
     Ok(Json(format!("Generated {} test sessions", payload.number)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapters::persistence::memory_repository::InMemorySessionRepository;
+    use crate::adapters::persistence::static_user_repository::StaticUserRepository;
+    use crate::domain::user::{LoginRequest, LoginResponse, RegisterRequest};
+    use axum_test::TestServer;
+
+    async fn setup_test_server() -> TestServer {
+        let session_repo = InMemorySessionRepository::new();
+        let user_repo = Arc::new(StaticUserRepository::new());
+        let session_service = SessionService::new(session_repo, "test_dir".to_string());
+        let auth_service = AuthService::new(user_repo);
+
+        let app = create_router(session_service, auth_service);
+        TestServer::new(app).expect("Failed to create test server")
+    }
+
+    #[tokio::test]
+    async fn test_register_and_login_flow() {
+        let server = setup_test_server().await;
+
+        // 1. Register a new user
+        let register_payload = RegisterRequest {
+            username: "testuser".to_string(),
+            password: "securepassword".to_string(),
+        };
+
+        let register_response = server.post("/register").json(&register_payload).await;
+
+        register_response.assert_status_success();
+        assert_eq!(register_response.status_code(), StatusCode::CREATED);
+
+        // 2. Try to register the same user again (should fail)
+        let duplicate_response = server.post("/register").json(&register_payload).await;
+
+        duplicate_response.assert_status_bad_request();
+
+        // 3. Login with the new user
+        let login_payload = LoginRequest {
+            username: "testuser".to_string(),
+            password: "securepassword".to_string(),
+        };
+
+        let login_response = server.post("/login").json(&login_payload).await;
+
+        login_response.assert_status_success();
+        let body: LoginResponse = login_response.json();
+        assert!(!body.token.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_login_with_invalid_credentials() {
+        let server = setup_test_server().await;
+
+        let login_payload = LoginRequest {
+            username: "nonexistent".to_string(),
+            password: "wrongpassword".to_string(),
+        };
+
+        let response = server.post("/login").json(&login_payload).await;
+
+        response.assert_status_unauthorized();
+    }
 }

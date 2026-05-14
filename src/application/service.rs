@@ -32,6 +32,7 @@ impl<R: SessionRepository> SessionService<R> {
 
     pub async fn start_session(
         &self,
+        user_id: Uuid,
         description: &str,
         duration_seconds: u64,
     ) -> Result<(), Box<dyn Error>> {
@@ -39,6 +40,7 @@ impl<R: SessionRepository> SessionService<R> {
 
         let session = Session {
             id: Uuid::new_v4(),
+            user_id,
             description: description.to_string(),
             duration: Duration::from_secs(duration_seconds),
             start: start_date,
@@ -57,8 +59,8 @@ impl<R: SessionRepository> SessionService<R> {
         Ok(())
     }
 
-    pub async fn load_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
-        self.repository.find_all().await
+    pub async fn load_sessions(&self, user_id: Uuid) -> Result<Vec<Session>, Box<dyn Error>> {
+        self.repository.find_all(user_id).await
     }
 
     pub async fn save_session(&self, session: &Session) -> Result<(), Box<dyn Error>> {
@@ -73,8 +75,11 @@ impl<R: SessionRepository> SessionService<R> {
         self.session_dir.clone()
     }
 
-    pub async fn find_all_active_sessions(&self) -> Result<Vec<Session>, Box<dyn Error>> {
-        let sessions = self.repository.find_all().await?;
+    pub async fn find_all_active_sessions(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Session>, Box<dyn Error>> {
+        let sessions = self.repository.find_all(user_id).await?;
         let now = Utc::now();
         let active_sessions = sessions
             .into_iter()
@@ -84,8 +89,8 @@ impl<R: SessionRepository> SessionService<R> {
         Ok(active_sessions)
     }
 
-    pub async fn update_pomodoro_status(&self) -> Result<(), Box<dyn Error>> {
-        if let Ok(sessions) = self.find_all_active_sessions().await {
+    pub async fn update_pomodoro_status(&self, user_id: Uuid) -> Result<(), Box<dyn Error>> {
+        if let Ok(sessions) = self.find_all_active_sessions(user_id).await {
             if let Some(session) = sessions.get(0) {
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -107,13 +112,14 @@ impl<R: SessionRepository> SessionService<R> {
 
     pub async fn find_sessions_in_range(
         &self,
+        user_id: Uuid,
         range_start: DateTime<Utc>,
         range_end: DateTime<Utc>,
         search_query: Option<String>,
     ) -> Result<Vec<Session>, Box<dyn Error>> {
         let sessions = self
             .repository
-            .find_in_range(range_start, range_end)
+            .find_in_range(user_id, range_start, range_end)
             .await?;
 
         let filtered = if let Some(query) = search_query {
@@ -129,8 +135,8 @@ impl<R: SessionRepository> SessionService<R> {
         Ok(filtered)
     }
 
-    pub async fn cleanup_expired_sessions(&self) -> Result<(), Box<dyn Error>> {
-        let mut sessions = self.repository.find_all().await?;
+    pub async fn cleanup_expired_sessions(&self, user_id: Uuid) -> Result<(), Box<dyn Error>> {
+        let mut sessions = self.repository.find_all(user_id).await?;
         let now = Utc::now();
         let mut changed = false;
         for session in sessions.iter_mut() {
@@ -141,7 +147,7 @@ impl<R: SessionRepository> SessionService<R> {
             }
         }
         if changed {
-            self.update_pomodoro_status().await?;
+            self.update_pomodoro_status(user_id).await?;
         }
         Ok(())
     }

@@ -55,6 +55,7 @@ pub enum Mode {
 }
 
 pub struct App<R: SessionRepository> {
+    pub user_id: uuid::Uuid,
     pub sessions: Vec<Session>,
     pub filtered_sessions: Vec<Session>,
     pub date_input: String,
@@ -77,11 +78,17 @@ pub struct App<R: SessionRepository> {
 }
 
 impl<R: SessionRepository> App<R> {
-    pub fn new(sessions: Vec<Session>, session_dir: String, repository: R) -> App<R> {
+    pub fn new(
+        user_id: uuid::Uuid,
+        sessions: Vec<Session>,
+        session_dir: String,
+        repository: R,
+    ) -> App<R> {
         let mut sessions = sessions;
         sessions.sort_by(|a, b| b.start.cmp(&a.start));
 
         let mut app = App {
+            user_id,
             filtered_sessions: Vec::new(),
             sessions,
             date_input: String::new(),
@@ -330,6 +337,7 @@ impl<R: SessionRepository> App<R> {
                 let start = Utc::now();
                 let new_session = Session {
                     id: uuid::Uuid::new_v4(),
+                    user_id: self.user_id,
                     description: selected_session.description.clone(),
                     duration: selected_session.duration,
                     start,
@@ -412,6 +420,7 @@ impl<R: SessionRepository> App<R> {
         let start = Utc::now();
         let session = Session {
             id: uuid::Uuid::new_v4(),
+            user_id: self.user_id,
             description,
             duration: Duration::from_secs(duration_mins * 60),
             start,

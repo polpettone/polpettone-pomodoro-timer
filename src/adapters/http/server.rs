@@ -12,7 +12,7 @@ use axum::{
 use chrono::Duration as ChronoDuration;
 use chrono::{NaiveDateTime, Utc};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,7 +24,7 @@ pub struct AppState<R: SessionRepository> {
     pub auth_service: AuthService,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct StartSessionRequest {
     pub description: String,
     pub duration_minutes: u64,
@@ -112,7 +112,7 @@ async fn register<R: SessionRepository + Send + Sync + 'static>(
 async fn check_auth<R: SessionRepository>(
     state: &AppState<R>,
     headers: &HeaderMap,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<crate::domain::user::User, (StatusCode, String)> {
     let auth_header = headers
         .get("Authorization")
         .and_then(|h| h.to_str().ok())
@@ -141,10 +141,10 @@ async fn start_session<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Json(payload): Json<StartSessionRequest>,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers).await?;
+    let user = check_auth(&state, &headers).await?;
     state
         .service
-        .start_session(&payload.description, payload.duration_minutes * 60)
+        .start_session(user.id, &payload.description, payload.duration_minutes * 60)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session started".to_string()))
@@ -154,10 +154,10 @@ async fn get_active_sessions<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
-    check_auth(&state, &headers).await?;
+    let user = check_auth(&state, &headers).await?;
     let sessions = state
         .service
-        .find_all_active_sessions()
+        .find_all_active_sessions(user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
@@ -168,7 +168,7 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Query(params): Query<FindSessionsRequest>,
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
-    check_auth(&state, &headers).await?;
+    let user = check_auth(&state, &headers).await?;
     let now = Utc::now();
     let start = if let Some(s) = params.start {
         NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
@@ -198,7 +198,7 @@ async fn get_sessions<R: SessionRepository + Send + Sync + 'static>(
 
     let sessions = state
         .service
-        .find_sessions_in_range(start, end, params.query)
+        .find_sessions_in_range(user.id, start, end, params.query)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(sessions))
@@ -208,7 +208,7 @@ async fn init_session_dir<R: SessionRepository + Send + Sync + 'static>(
     State(state): State<Arc<AppState<R>>>,
     headers: HeaderMap,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers).await?;
+    let _user = check_auth(&state, &headers).await?;
     state
         .service
         .init_session_dir()
@@ -222,7 +222,7 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
     headers: HeaderMap,
     Json(payload): Json<GenerateRequest>,
 ) -> Result<Json<String>, (StatusCode, String)> {
-    check_auth(&state, &headers).await?;
+    let user = check_auth(&state, &headers).await?;
     let now = Utc::now();
     let descriptions = vec![
         "Implement feature X",
@@ -249,6 +249,7 @@ async fn generate_test_data<R: SessionRepository + Send + Sync + 'static>(
 
             Session {
                 id: uuid::Uuid::new_v4(),
+                user_id: user.id,
                 description: descriptions[rng.random_range(0..descriptions.len())].to_string(),
                 duration: Duration::from_secs(25 * 60),
                 start: start_time,
@@ -332,5 +333,65 @@ mod tests {
         let response = server.post("/login").json(&login_payload).await;
 
         response.assert_status_unauthorized();
+    }
+
+    #[tokio::test]
+    async fn test_user_scoped_sessions() {
+        let server = setup_test_server().await;
+
+        // 1. Register and login User A
+        let user_a = RegisterRequest {
+            username: "user_a".to_string(),
+            password: "password_a".to_string(),
+        };
+        server
+            .post("/register")
+            .json(&user_a)
+            .await
+            .assert_status_success();
+        let login_a: LoginResponse = server.post("/login").json(&user_a).await.json();
+
+        // 2. Register and login User B
+        let user_b = RegisterRequest {
+            username: "user_b".to_string(),
+            password: "password_b".to_string(),
+        };
+        server
+            .post("/register")
+            .json(&user_b)
+            .await
+            .assert_status_success();
+        let login_b: LoginResponse = server.post("/login").json(&user_b).await.json();
+
+        // 3. User A starts a session
+        let session_req = StartSessionRequest {
+            description: "User A session".to_string(),
+            duration_minutes: 25,
+        };
+        server
+            .post("/sessions/start")
+            .add_header("Authorization", format!("Bearer {}", login_a.token))
+            .json(&session_req)
+            .await
+            .assert_status_success();
+
+        // 4. User B checks active sessions (should be empty)
+        let active_b_res = server
+            .get("/sessions/active")
+            .add_header("Authorization", format!("Bearer {}", login_b.token))
+            .await;
+        active_b_res.assert_status_success();
+        let sessions_b: Vec<Session> = active_b_res.json();
+        assert_eq!(sessions_b.len(), 0);
+
+        // 5. User A checks active sessions (should have 1)
+        let active_a_res = server
+            .get("/sessions/active")
+            .add_header("Authorization", format!("Bearer {}", login_a.token))
+            .await;
+        active_a_res.assert_status_success();
+        let sessions_a: Vec<Session> = active_a_res.json();
+        assert_eq!(sessions_a.len(), 1);
+        assert_eq!(sessions_a[0].description, "User A session");
     }
 }

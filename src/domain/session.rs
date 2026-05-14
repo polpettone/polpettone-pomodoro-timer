@@ -29,6 +29,7 @@ fn default_state() -> SessionState {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub description: String,
     pub duration: Duration,
     #[serde(

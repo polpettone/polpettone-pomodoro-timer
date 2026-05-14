@@ -20,7 +20,7 @@ impl PostgresRepository {
     }
 
     pub async fn init_db(&self) -> Result<(), Box<dyn Error>> {
-        // Create users table with JSONB
+        // Create users table
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY,
@@ -33,10 +33,11 @@ impl PostgresRepository {
         .execute(&self.pool)
         .await?;
 
-        // Create sessions table with JSONB
+        // Create sessions table with user_id index
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS sessions (
                 id UUID PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 start_time TIMESTAMPTZ NOT NULL,
                 data JSONB NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -45,6 +46,10 @@ impl PostgresRepository {
         )
         .execute(&self.pool)
         .await?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+            .execute(&self.pool)
+            .await?;
 
         // Seed default users if empty
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
@@ -87,13 +92,14 @@ impl SessionRepository for PostgresRepository {
             let data = serde_json::to_value(&session)?;
 
             sqlx::query(
-                "INSERT INTO sessions (id, start_time, data, modified_at)
-                 VALUES ($1, $2, $3, NOW())
+                "INSERT INTO sessions (id, user_id, start_time, data, modified_at)
+                 VALUES ($1, $2, $3, $4, NOW())
                  ON CONFLICT (id) DO UPDATE SET
                     data = EXCLUDED.data,
                     modified_at = NOW()",
             )
             .bind(session.id)
+            .bind(session.user_id)
             .bind(session.start)
             .bind(data)
             .execute(&pool)
@@ -104,12 +110,18 @@ impl SessionRepository for PostgresRepository {
 
     fn find_all(
         &self,
+        user_id: Uuid,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
         let pool = self.pool.clone();
         Box::pin(async move {
-            let rows = sqlx::query("SELECT data FROM sessions ORDER BY start_time DESC")
-                .fetch_all(&pool)
-                .await?;
+            let rows = sqlx::query(
+                "SELECT data FROM sessions
+                 WHERE user_id = $1
+                 ORDER BY start_time DESC",
+            )
+            .bind(user_id)
+            .fetch_all(&pool)
+            .await?;
 
             let mut sessions = Vec::new();
             for row in rows {
@@ -123,6 +135,7 @@ impl SessionRepository for PostgresRepository {
 
     fn find_in_range(
         &self,
+        user_id: Uuid,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
@@ -130,9 +143,10 @@ impl SessionRepository for PostgresRepository {
         Box::pin(async move {
             let rows = sqlx::query(
                 "SELECT data FROM sessions
-                 WHERE start_time >= $1 AND start_time <= $2
+                 WHERE user_id = $1 AND start_time >= $2 AND start_time <= $3
                  ORDER BY start_time DESC",
             )
+            .bind(user_id)
             .bind(start)
             .bind(end)
             .fetch_all(&pool)

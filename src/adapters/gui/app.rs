@@ -30,6 +30,7 @@ struct Model {
 }
 
 pub fn run<R: SessionRepository + Send + 'static>(
+    user_id: uuid::Uuid,
     session_service: SessionService<R>,
 ) -> Result<(), Box<dyn Error>> {
     let (cmd_tx, cmd_rx) = channel();
@@ -50,13 +51,13 @@ pub fn run<R: SessionRepository + Send + 'static>(
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     GuiCommand::StartSession(desc, dur) => {
-                        let _ = handle.block_on(session_service.start_session(&desc, dur));
+                        let _ = handle.block_on(session_service.start_session(user_id, &desc, dur));
                     }
                 }
             }
 
             // Send periodic updates
-            if let Ok(mut sessions) = handle.block_on(session_service.load_sessions()) {
+            if let Ok(mut sessions) = handle.block_on(session_service.load_sessions(user_id)) {
                 sessions.sort_by(|a, b| b.start.cmp(&a.start));
                 let _ = data_tx.send(GuiData { sessions });
             }

@@ -6,6 +6,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 #[derive(Clone, Default)]
 pub struct InMemorySessionRepository {
@@ -40,16 +41,23 @@ impl SessionRepository for InMemorySessionRepository {
 
     fn find_all(
         &self,
+        user_id: Uuid,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
         let sessions = self.sessions.clone();
         Box::pin(async move {
             let sessions = sessions.lock().map_err(|e| e.to_string())?;
-            Ok(sessions.clone())
+            let filtered = sessions
+                .iter()
+                .filter(|s| s.user_id == user_id)
+                .cloned()
+                .collect();
+            Ok(filtered)
         })
     }
 
     fn find_in_range(
         &self,
+        user_id: Uuid,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Session>, Box<dyn Error>>> + Send + '_>> {
@@ -58,7 +66,7 @@ impl SessionRepository for InMemorySessionRepository {
             let sessions = sessions.lock().map_err(|e| e.to_string())?;
             let filtered = sessions
                 .iter()
-                .filter(|s| s.start >= start && s.start <= end)
+                .filter(|s| s.user_id == user_id && s.start >= start && s.start <= end)
                 .cloned()
                 .collect();
             Ok(filtered)

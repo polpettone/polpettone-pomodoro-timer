@@ -11,6 +11,7 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     sub: String, // Username
+    user_id: String,
     exp: usize,
 }
 
@@ -30,6 +31,10 @@ impl AuthService {
         }
     }
 
+    pub fn user_repository(&self) -> Arc<dyn UserRepository + Send + Sync> {
+        self.user_repository.clone()
+    }
+
     pub async fn login(&self, request: LoginRequest) -> Result<LoginResponse, Box<dyn Error>> {
         let user = self
             .user_repository
@@ -46,6 +51,7 @@ impl AuthService {
 
                 let claims = Claims {
                     sub: user.username.clone(),
+                    user_id: user.id.to_string(),
                     exp: expiration,
                 };
 
@@ -88,7 +94,7 @@ impl AuthService {
         Ok(())
     }
 
-    pub async fn validate_token(&self, token: &str) -> Option<String> {
+    pub async fn validate_token(&self, token: &str) -> Option<User> {
         let validation = Validation::default();
         match decode::<Claims>(
             token,
@@ -99,7 +105,7 @@ impl AuthService {
                 let username = token_data.claims.sub;
                 // Prüfen, ob der Benutzer noch existiert
                 match self.user_repository.find_by_username(&username).await {
-                    Ok(Some(_)) => Some(username),
+                    Ok(Some(user)) => Some(user),
                     _ => None,
                 }
             }

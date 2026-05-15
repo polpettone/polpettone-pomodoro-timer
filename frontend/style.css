@@ -212,6 +212,38 @@ th {
     margin-top: 1rem;
 }
 
+/* Filters */
+.filters-container {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid var(--border-color);
+}
+
+.filter-search {
+    flex: 1;
+    min-width: 150px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.checkbox-label input {
+    width: auto;
+    margin: 0;
+}
+
+.wrap {
+    flex-wrap: wrap;
+}
+
 /* Inline Editor & List Styles */
 .sessions-list {
     display: flex;

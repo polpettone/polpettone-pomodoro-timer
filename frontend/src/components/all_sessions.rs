@@ -1,8 +1,10 @@
 use crate::api::{
-    delete_session, fetch_all_sessions, start_session, update_session, StartSessionRequest,
-    UpdateSessionRequest,
+    delete_session, start_session, update_session, StartSessionRequest, UpdateSessionRequest,
+    API_BASE_URL,
 };
 use crate::models::{Session, SessionRatings};
+use chrono::{Datelike, Utc};
+use gloo_net::http::Request;
 use leptos::*;
 
 #[component]
@@ -11,14 +13,68 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
     let (is_open, set_is_open) = create_signal(false);
     let (expanded_id, set_expanded_id) = create_signal(None::<uuid::Uuid>);
 
+    // Filter signals
+    let (search_query, set_search_query) = create_signal("".to_string());
+
+    let now = Utc::now();
+    let today_str = format!("{}-{:02}-{:02}", now.year(), now.month(), now.day());
+    let month_ago_dt = now - chrono::Duration::days(30);
+    let month_ago_str = format!(
+        "{}-{:02}-{:02}",
+        month_ago_dt.year(),
+        month_ago_dt.month(),
+        month_ago_dt.day()
+    );
+
+    let (start_date, set_start_date) = create_signal(month_ago_str);
+    let (end_date, set_end_date) = create_signal(today_str);
+    let (show_deleted, set_show_deleted) = create_signal(false);
+
     let sessions = create_resource(
-        move || (is_open.get(), token.get_value()),
-        |(open, t)| async move {
-            if open {
-                fetch_all_sessions(t).await
-            } else {
-                Ok(vec![])
+        move || {
+            (
+                is_open.get(),
+                token.get_value(),
+                search_query.get(),
+                start_date.get(),
+                end_date.get(),
+            )
+        },
+        |(open, t, query, start, end)| async move {
+            if !open {
+                return Ok(vec![]);
             }
+
+            // Construct URL with query parameters for the backend
+            let url = format!(
+                "{}/sessions?start={}%2000:00:00&end={}%2023:59:59&query={}",
+                API_BASE_URL,
+                start,
+                end,
+                query.replace(" ", "%20")
+            );
+
+            let resp = Request::get(&url)
+                .header("Authorization", &format!("Bearer {}", t))
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+
+            if !resp.ok() {
+                if resp.status() == 401 {
+                    return Err("Nicht autorisiert.".to_string());
+                }
+                return Err(format!("Fehler beim Laden der Historie: {}", resp.status()));
+            }
+
+            let mut data = resp
+                .json::<Vec<Session>>()
+                .await
+                .map_err(|e| e.to_string())?;
+
+            data.sort_by(|a, b| b.start.cmp(&a.start));
+
+            Ok(data)
         },
     );
 
@@ -42,30 +98,68 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
             </button>
 
             <div class="expand-content" class:open=is_open>
+                <div class="filters-container card">
+                    <div class="flex gap-2 items-center wrap">
+                        <input
+                            type="text"
+                            placeholder="Suchen..."
+                            class="filter-search"
+                            prop:value=search_query
+                            on:input=move |ev| set_search_query.set(event_target_value(&ev))
+                        />
+                        <div class="flex items-center gap-1">
+                            <input
+                                type="date"
+                                prop:value=start_date
+                                on:change=move |ev| set_start_date.set(event_target_value(&ev))
+                            />
+                            <span>" bis "</span>
+                            <input
+                                type="date"
+                                prop:value=end_date
+                                on:change=move |ev| set_end_date.set(event_target_value(&ev))
+                            />
+                        </div>
+                        <label class="checkbox-label">
+                            <input
+                                type="checkbox"
+                                prop:checked=show_deleted
+                                on:change=move |ev| set_show_deleted.set(event_target_checked(&ev))
+                            />
+                            " Gelöschte"
+                        </label>
+                    </div>
+                </div>
+
                 <Transition fallback=move || view! { <p class="status-msg">"Lade Historie..."</p> }>
                     {move || {
                         sessions.get().map(|res| match res {
                             Ok(data) => {
-                                if data.is_empty() {
-                                    view! { <p class="status-msg">"Keine Sitzungen in der Historie."</p> }.into_view()
+                                let filtered_data: Vec<_> = data.into_iter()
+                                    .filter(|s| show_deleted.get() || s.state != "Deleted")
+                                    .collect();
+
+                                if filtered_data.is_empty() {
+                                    view! { <p class="status-msg">"Keine Sitzungen gefunden."</p> }.into_view()
                                 } else {
                                     view! {
                                         <div class="sessions-list">
-                                            {data.into_iter().map(|s| {
-                                                let is_expanded = move || expanded_id.get() == Some(s.id);
-                                                let s_clone = s.clone();
-                                                let s_quick = s.clone();
+                                            {filtered_data.into_iter().map(|s| {
+                                                let s_id = s.id;
+                                                let s_stored = store_value(s);
+                                                let is_expanded = move || expanded_id.get() == Some(s_id);
 
                                                 let on_quick_clone = {
                                                     let t = token.get_value();
                                                     move |ev: leptos::ev::MouseEvent| {
                                                         ev.stop_propagation();
+                                                        let s = s_stored.get_value();
                                                         let payload = StartSessionRequest {
-                                                            description: s_quick.description.clone(),
-                                                            duration_minutes: s_quick.duration.secs / 60,
-                                                            tags: Some(s_quick.tags.clone()),
-                                                            notes: Some(s_quick.notes.clone()),
-                                                            ratings: s_quick.ratings.clone(),
+                                                            description: s.description.clone(),
+                                                            duration_minutes: s.duration.secs / 60,
+                                                            tags: Some(s.tags.clone()),
+                                                            notes: Some(s.notes.clone()),
+                                                            ratings: s.ratings.clone(),
                                                         };
                                                         let t = t.clone();
                                                         spawn_local(async move {
@@ -81,11 +175,11 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                     <div class="session-item-container" class:expanded=is_expanded>
                                                         <div
                                                             class="session-summary"
-                                                            on:click={let id = s.id; move |_| toggle_expand(id)}
+                                                            on:click=move |_| toggle_expand(s_id)
                                                         >
                                                             <div class="session-main-info">
-                                                                <span class="session-time">{&s.start}</span>
-                                                                <span class="session-desc">{&s.description}</span>
+                                                                <span class="session-time">{move || s_stored.get_value().start}</span>
+                                                                <span class="session-desc">{move || s_stored.get_value().description}</span>
                                                             </div>
                                                             <div class="session-meta-info">
                                                                 <button
@@ -95,8 +189,10 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                                 >
                                                                     "▶"
                                                                 </button>
-                                                                <span class="session-duration">{s.duration.secs / 60} "m"</span>
-                                                                <span class=format!("state-tag {}", s.state.to_lowercase())>{&s.state}</span>
+                                                                <span class="session-duration">{move || s_stored.get_value().duration.secs / 60} "m"</span>
+                                                                <span class=move || format!("state-tag {}", s_stored.get_value().state.to_lowercase())>
+                                                                    {move || s_stored.get_value().state}
+                                                                </span>
                                                                 <span class="expand-icon">{move || if is_expanded() { "▲" } else { "▼" }}</span>
                                                             </div>
                                                         </div>
@@ -104,7 +200,7 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                         <Show when=is_expanded>
                                                             <SessionEditor
                                                                 token=token.get_value()
-                                                                session=s_clone.clone()
+                                                                session=s_stored.get_value()
                                                                 on_updated=move |_| {
                                                                     sessions.refetch();
                                                                     on_update.call(());

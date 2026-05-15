@@ -36,19 +36,27 @@ fn App() -> impl IntoView {
 
             {move || match token.get() {
                 Some(t) => {
-                    let t_active = t.clone();
-                    let t_start = t.clone();
-                    let t_all = t.clone();
-                    let sessions = create_resource(move || t_active.clone(), |t| fetch_active_sessions(t));
+                    let t_stored = store_value(t);
+                    let sessions = create_resource(move || t_stored.get_value(), |t| fetch_active_sessions(t));
+
                     view! {
                         <section class="card">
-                            <StartSession token=t_start on_success=move |_| sessions.refetch() />
+                            <StartSession
+                                token=t_stored.get_value()
+                                on_success=move |_| sessions.refetch()
+                            />
                         </section>
                         <section class="card">
-                            <ActiveSessions sessions=sessions />
+                            <ActiveSessions
+                                token=t_stored.get_value()
+                                sessions=sessions
+                            />
                         </section>
                         <section class="card">
-                            <AllSessions token=t_all on_update=move |_| sessions.refetch() />
+                            <AllSessions
+                                token=t_stored.get_value()
+                                on_update=move |_| sessions.refetch()
+                            />
                         </section>
                     }.into_view()
                 },

@@ -99,7 +99,7 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
 }
 
 #[component]
-fn SessionEditor(
+pub fn SessionEditor(
     token: String,
     session: Session,
     #[prop(into)] on_updated: Callback<()>,

@@ -232,6 +232,16 @@ th {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
+.active-session-item {
+    border-left: 4px solid var(--accent-color);
+    background-color: rgba(255, 82, 82, 0.05);
+}
+
+.active-session-item .session-desc {
+    font-size: 1.1rem;
+    color: var(--accent-color);
+}
+
 .session-summary {
     display: flex;
     justify-content: space-between;

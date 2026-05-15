@@ -28,6 +28,9 @@ pub struct AppState<R: SessionRepository> {
 pub struct StartSessionRequest {
     pub description: String,
     pub duration_minutes: u64,
+    pub tags: Option<Vec<String>>,
+    pub notes: Option<String>,
+    pub ratings: Option<crate::domain::session::SessionRatings>,
 }
 
 #[derive(Deserialize)]
@@ -155,7 +158,14 @@ async fn start_session<R: SessionRepository + Send + Sync + 'static>(
     let user = check_auth(&state, &headers).await?;
     state
         .service
-        .start_session(user.id, &payload.description, payload.duration_minutes * 60)
+        .start_session(
+            user.id,
+            &payload.description,
+            payload.duration_minutes * 60,
+            payload.tags,
+            payload.notes,
+            payload.ratings,
+        )
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json("Session started".to_string()))
@@ -449,6 +459,9 @@ mod tests {
         let session_req = StartSessionRequest {
             description: "User A session".to_string(),
             duration_minutes: 25,
+            tags: None,
+            notes: None,
+            ratings: None,
         };
         server
             .post("/sessions/start")
@@ -496,6 +509,9 @@ mod tests {
         let start_req = StartSessionRequest {
             description: "Initial description".to_string(),
             duration_minutes: 25,
+            tags: None,
+            notes: None,
+            ratings: None,
         };
         server
             .post("/sessions/start")

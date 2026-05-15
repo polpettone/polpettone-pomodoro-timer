@@ -1,6 +1,6 @@
-use leptos::*;
-use gloo_net::http::Request;
 use crate::api::API_BASE_URL;
+use gloo_net::http::Request;
+use leptos::*;
 
 #[component]
 pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
@@ -27,13 +27,15 @@ pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
                 return Err("Login fehlgeschlagen. Überprüfen Sie Ihre Zugangsdaten.".to_string());
             }
 
-            let data = resp.json::<serde_json::Value>()
+            let data = resp
+                .json::<serde_json::Value>()
                 .await
                 .map_err(|e| e.to_string())?;
-            
-            let token = data["token"].as_str()
+
+            let token = data["token"]
+                .as_str()
                 .ok_or_else(|| "Kein Token in der Antwort".to_string())?;
-            
+
             Ok::<String, String>(token.to_string())
         }
     });
@@ -48,14 +50,14 @@ pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
         <div class="login-form">
             <h2>"Anmelden"</h2>
             <div class="flex flex-col gap-2">
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     placeholder="Benutzername"
                     on:input=move |ev| set_username.set(event_target_value(&ev))
                     prop:value=username
                 />
-                <input 
-                    type="password" 
+                <input
+                    type="password"
                     placeholder="Passwort"
                     on:input=move |ev| set_password.set(event_target_value(&ev))
                     on:keydown=move |ev| {
@@ -65,7 +67,7 @@ pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
                     }
                     prop:value=password
                 />
-                <button 
+                <button
                     on:click=move |_| login_action.dispatch((username.get(), password.get()))
                     disabled=move || login_action.pending().get()
                 >
@@ -83,7 +85,6 @@ pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
                     view! { <div class="status-msg" /> }.into_view()
                 }
             }}
-            <p class="hint">"Tipp: admin / admin"</p>
         </div>
     }
 }

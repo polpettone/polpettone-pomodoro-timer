@@ -1,4 +1,7 @@
-use crate::api::{delete_session, fetch_all_sessions, update_session, UpdateSessionRequest};
+use crate::api::{
+    delete_session, fetch_all_sessions, start_session, update_session, StartSessionRequest,
+    UpdateSessionRequest,
+};
 use crate::models::{Session, SessionRatings};
 use leptos::*;
 
@@ -190,6 +193,44 @@ pub fn SessionEditor(
         }
     };
 
+    let handle_clone_start = move |_| {
+        set_is_submitting.set(true);
+        let t = token.get_value();
+
+        let tag_list = tags
+            .get()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let payload = StartSessionRequest {
+            description: description.get(),
+            duration_minutes: session.duration.secs / 60,
+            tags: Some(tag_list),
+            notes: Some(notes.get()),
+            ratings: Some(SessionRatings {
+                mental_energy: mental.get(),
+                physical_energy: physical.get(),
+                cognitive_load: cognitive.get(),
+                motivation: motivation.get(),
+            }),
+        };
+
+        spawn_local(async move {
+            match start_session(t, payload).await {
+                Ok(_) => {
+                    set_is_submitting.set(false);
+                    on_updated.call(());
+                }
+                Err(e) => {
+                    set_error_msg.set(Some(e));
+                    set_is_submitting.set(false);
+                }
+            }
+        });
+    };
+
     view! {
         <div class="inline-editor">
             <div class="form-group">
@@ -225,7 +266,18 @@ pub fn SessionEditor(
             {move || error_msg.get().map(|msg| view! { <p class="error-msg">{msg}</p> })}
 
             <div class="editor-actions">
-                <button class="delete-btn-subtle" on:click=handle_delete>"Löschen"</button>
+                <div class="flex gap-2">
+                    <button class="delete-btn-subtle" on:click=handle_delete>
+                        "Löschen"
+                    </button>
+                    <button
+                        class="edit-btn"
+                        on:click=handle_clone_start
+                        disabled=is_submitting
+                    >
+                        "Klonen & Start"
+                    </button>
+                </div>
                 <button class="save-btn" on:click=handle_save disabled=is_submitting>
                     {move || if is_submitting.get() { "..." } else { "Speichern" }}
                 </button>

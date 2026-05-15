@@ -140,7 +140,7 @@ async fn handle_start<R: SessionRepository>(
 ) -> Result<(), Box<dyn Error>> {
     println!("Starting session: {} for {} minutes", description, duration);
     session_service
-        .start_session(user_id, &description, duration * 60)
+        .start_session(user_id, &description, duration * 60, None, None, None)
         .await?;
     Ok(())
 }

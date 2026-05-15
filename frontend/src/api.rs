@@ -52,6 +52,31 @@ pub async fn fetch_all_sessions(token: String) -> Result<Vec<Session>, String> {
 }
 
 #[derive(Serialize)]
+pub struct StartSessionRequest {
+    pub description: String,
+    pub duration_minutes: u64,
+    pub tags: Option<Vec<String>>,
+    pub notes: Option<String>,
+    pub ratings: Option<SessionRatings>,
+}
+
+pub async fn start_session(token: String, payload: StartSessionRequest) -> Result<(), String> {
+    let resp = Request::post(&format!("{}/sessions/start", API_BASE_URL))
+        .header("Authorization", &format!("Bearer {}", token))
+        .json(&payload)
+        .map_err(|e| e.to_string())?
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.ok() {
+        return Err(format!("Fehler beim Starten: {}", resp.status()));
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
 pub struct UpdateSessionRequest {
     pub description: Option<String>,
     pub tags: Option<Vec<String>>,

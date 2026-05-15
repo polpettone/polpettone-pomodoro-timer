@@ -35,6 +35,9 @@ impl<R: SessionRepository> SessionService<R> {
         user_id: Uuid,
         description: &str,
         duration_seconds: u64,
+        tags: Option<Vec<String>>,
+        notes: Option<String>,
+        ratings: Option<crate::domain::session::SessionRatings>,
     ) -> Result<(), Box<dyn Error>> {
         let start_date = Utc::now();
 
@@ -44,10 +47,10 @@ impl<R: SessionRepository> SessionService<R> {
             description: description.to_string(),
             duration: Duration::from_secs(duration_seconds),
             start: start_date,
-            tags: Vec::new(),
-            notes: String::new(),
+            tags: tags.unwrap_or_default(),
+            notes: notes.unwrap_or_default(),
             state: SessionState::Running,
-            ratings: None,
+            ratings,
         };
 
         self.repository.save(&session).await?;

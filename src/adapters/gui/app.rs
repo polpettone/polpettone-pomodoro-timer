@@ -51,7 +51,9 @@ pub fn run<R: SessionRepository + Send + 'static>(
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     GuiCommand::StartSession(desc, dur) => {
-                        let _ = handle.block_on(session_service.start_session(user_id, &desc, dur));
+                        let _ = handle.block_on(
+                            session_service.start_session(user_id, &desc, dur, None, None, None),
+                        );
                     }
                 }
             }

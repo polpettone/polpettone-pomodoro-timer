@@ -1,6 +1,5 @@
+use crate::api::{start_session, StartSessionRequest};
 use leptos::*;
-use gloo_net::http::Request;
-use crate::api::API_BASE_URL;
 
 #[component]
 pub fn StartSession(token: String, #[prop(into)] on_success: Callback<()>) -> impl IntoView {
@@ -12,19 +11,14 @@ pub fn StartSession(token: String, #[prop(into)] on_success: Callback<()>) -> im
         let dur = *dur;
         let token = token.clone();
         async move {
-            let payload = serde_json::json!({
-                "description": desc,
-                "duration_minutes": dur,
-            });
-
-            Request::post(&format!("{}/sessions/start", API_BASE_URL))
-                .header("Authorization", &format!("Bearer {}", token))
-                .json(&payload)
-                .map_err(|e| e.to_string())?
-                .send()
-                .await
-                .map_err(|e| e.to_string())?;
-            Ok::<(), String>(())
+            let payload = StartSessionRequest {
+                description: desc,
+                duration_minutes: dur,
+                tags: None,
+                notes: None,
+                ratings: None,
+            };
+            start_session(token, payload).await
         }
     });
 
@@ -39,8 +33,8 @@ pub fn StartSession(token: String, #[prop(into)] on_success: Callback<()>) -> im
         <div>
             <h2>"Neue Sitzung starten"</h2>
             <div class="flex justify-center items-center">
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     placeholder="Beschreibung"
                     on:input=move |ev| set_description.set(event_target_value(&ev))
                     on:keydown=move |ev| {
@@ -50,8 +44,8 @@ pub fn StartSession(token: String, #[prop(into)] on_success: Callback<()>) -> im
                     }
                     prop:value=description
                 />
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     inputmode="numeric"
                     style="width: 80px"
                     on:input=move |ev| {
@@ -61,7 +55,7 @@ pub fn StartSession(token: String, #[prop(into)] on_success: Callback<()>) -> im
                     }
                     prop:value=duration
                 />
-                <button 
+                <button
                     on:click=move |_| start_action.dispatch((description.get(), duration.get().parse().unwrap_or(25)))
                     disabled=move || start_action.pending().get()
                 >

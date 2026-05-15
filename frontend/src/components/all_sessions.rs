@@ -54,6 +54,29 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                             {data.into_iter().map(|s| {
                                                 let is_expanded = move || expanded_id.get() == Some(s.id);
                                                 let s_clone = s.clone();
+                                                let s_quick = s.clone();
+
+                                                let on_quick_clone = {
+                                                    let t = token.get_value();
+                                                    move |ev: leptos::ev::MouseEvent| {
+                                                        ev.stop_propagation();
+                                                        let payload = StartSessionRequest {
+                                                            description: s_quick.description.clone(),
+                                                            duration_minutes: s_quick.duration.secs / 60,
+                                                            tags: Some(s_quick.tags.clone()),
+                                                            notes: Some(s_quick.notes.clone()),
+                                                            ratings: s_quick.ratings.clone(),
+                                                        };
+                                                        let t = t.clone();
+                                                        spawn_local(async move {
+                                                            if let Ok(_) = start_session(t, payload).await {
+                                                                sessions.refetch();
+                                                                on_update.call(());
+                                                            }
+                                                        });
+                                                    }
+                                                };
+
                                                 view! {
                                                     <div class="session-item-container" class:expanded=is_expanded>
                                                         <div
@@ -65,6 +88,13 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                                 <span class="session-desc">{&s.description}</span>
                                                             </div>
                                                             <div class="session-meta-info">
+                                                                <button
+                                                                    class="quick-clone-btn"
+                                                                    title="Klonen & Starten"
+                                                                    on:click=on_quick_clone
+                                                                >
+                                                                    "▶"
+                                                                </button>
                                                                 <span class="session-duration">{s.duration.secs / 60} "m"</span>
                                                                 <span class=format!("state-tag {}", s.state.to_lowercase())>{&s.state}</span>
                                                                 <span class="expand-icon">{move || if is_expanded() { "▲" } else { "▼" }}</span>

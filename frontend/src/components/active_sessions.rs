@@ -1,4 +1,4 @@
-use crate::api::{start_session, StartSessionRequest};
+use crate::api::{delete_session, start_session, StartSessionRequest};
 use crate::components::all_sessions::SessionEditor;
 use crate::components::timer::Timer;
 use crate::models::Session;
@@ -60,6 +60,21 @@ pub fn ActiveSessions(
                                                 }
                                             };
 
+                                            let on_quick_delete = {
+                                                let t = token_stored.get_value();
+                                                move |ev: leptos::ev::MouseEvent| {
+                                                    ev.stop_propagation();
+                                                    if window().confirm_with_message("Sitzung wirklich löschen?").unwrap_or(false) {
+                                                        let t = t.clone();
+                                                        spawn_local(async move {
+                                                            if let Ok(_) = delete_session(t, s_id).await {
+                                                                sessions.refetch();
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            };
+
                                             view! {
                                                 <div class="session-item-container active-session-item" class:expanded=is_expanded>
                                                     <div
@@ -71,6 +86,13 @@ pub fn ActiveSessions(
                                                             <Timer session=s_stored.get_value() />
                                                         </div>
                                                         <div class="session-meta-info">
+                                                            <button
+                                                                class="quick-delete-btn"
+                                                                title="Löschen"
+                                                                on:click=on_quick_delete
+                                                            >
+                                                                "🗑"
+                                                            </button>
                                                             <button
                                                                 class="quick-clone-btn"
                                                                 title="Klonen & Starten"

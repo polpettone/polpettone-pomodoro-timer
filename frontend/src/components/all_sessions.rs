@@ -171,6 +171,22 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                     }
                                                 };
 
+                                                let on_quick_delete = {
+                                                    let t = token.get_value();
+                                                    move |ev: leptos::ev::MouseEvent| {
+                                                        ev.stop_propagation();
+                                                        if window().confirm_with_message("Sitzung wirklich löschen?").unwrap_or(false) {
+                                                            let t = t.clone();
+                                                            spawn_local(async move {
+                                                                if let Ok(_) = delete_session(t, s_id).await {
+                                                                    sessions.refetch();
+                                                                    on_update.call(());
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                };
+
                                                 view! {
                                                     <div class="session-item-container" class:expanded=is_expanded>
                                                         <div
@@ -182,6 +198,13 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                                 <span class="session-desc">{move || s_stored.get_value().description}</span>
                                                             </div>
                                                             <div class="session-meta-info">
+                                                                <button
+                                                                    class="quick-delete-btn"
+                                                                    title="Löschen"
+                                                                    on:click=on_quick_delete
+                                                                >
+                                                                    "🗑"
+                                                                </button>
                                                                 <button
                                                                     class="quick-clone-btn"
                                                                     title="Klonen & Starten"

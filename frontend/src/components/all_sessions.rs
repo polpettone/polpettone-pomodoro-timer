@@ -166,11 +166,34 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                     .filter(|s| show_deleted.get() || s.state != "Deleted")
                                     .collect();
 
-                                if filtered_data.is_empty() {
-                                    view! { <p class="status-msg">"Keine Sitzungen gefunden."</p> }.into_view()
-                                } else {
-                                    view! {
-                                        <div class="sessions-list">
+                                let total_count = filtered_data.len();
+                                let total_minutes: u64 = filtered_data.iter().map(|s| s.duration.secs / 60).sum();
+                                let total_hours = total_minutes / 60;
+                                let remaining_minutes = total_minutes % 60;
+
+                                view! {
+                                    <div class="stats-bar">
+                                        <div class="stats-item">
+                                            <span class="stats-label">"Anzahl:"</span>
+                                            <span class="stats-value">{total_count}</span>
+                                        </div>
+                                        <div class="stats-item">
+                                            <span class="stats-label">"Gesamtzeit:"</span>
+                                            <span class="stats-value">
+                                                {if total_hours > 0 {
+                                                    format!("{}h {}m", total_hours, remaining_minutes)
+                                                } else {
+                                                    format!("{}m", remaining_minutes)
+                                                }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {if filtered_data.is_empty() {
+                                        view! { <p class="status-msg">"Keine Sitzungen gefunden."</p> }.into_view()
+                                    } else {
+                                        view! {
+                                            <div class="sessions-list">
                                             {filtered_data.into_iter().map(|s| {
                                                 let s_id = s.id;
                                                 let s_stored = store_value(s);
@@ -277,9 +300,10 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                             }).collect_view()}
                                         </div>
                                     }.into_view()
-                                }
-                            },
-                            Err(e) => view! { <p class="status-msg" style="color: var(--accent-color)">{e}</p> }.into_view(),
+                                }}
+                            }.into_view()
+                        },
+                        Err(e) => view! { <p class="status-msg" style="color: var(--accent-color)">{e}</p> }.into_view(),
                         })
                     }}
                 </Transition>

@@ -75,11 +75,22 @@ pub fn ActiveSessions(
                                                 }
                                             };
 
+                                            let on_summary_click = move |_| toggle_expand(s_id);
+                                            let on_summary_keydown = move |ev: leptos::ev::KeyboardEvent| {
+                                                if ev.key() == "Enter" || ev.key() == " " {
+                                                    ev.prevent_default();
+                                                    toggle_expand(s_id);
+                                                }
+                                            };
+
                                             view! {
                                                 <div class="session-item-container active-session-item" class:expanded=is_expanded>
                                                     <div
                                                         class="session-summary"
-                                                        on:click=move |_| toggle_expand(s_id)
+                                                        role="button"
+                                                        tabindex="0"
+                                                        on:click=on_summary_click
+                                                        on:keydown=on_summary_keydown
                                                     >
                                                         <div class="session-main-info">
                                                             <span class="session-desc">{move || s_stored.get_value().description}</span>

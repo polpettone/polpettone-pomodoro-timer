@@ -47,6 +47,21 @@ input {
 input:focus {
     border-color: var(--accent-color);
 }
+
+/* Accessibility & Keyboard Navigation */
+:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+[role="button"]:focus {
+    outline: none;
+}
+
+[role="button"]:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: -2px;
+}
 button {
     padding: 0.75rem 1.5rem;
     cursor: pointer;
@@ -299,6 +314,11 @@ th {
     padding: 0.75rem 1rem;
     cursor: pointer;
     user-select: none;
+    outline: none;
+}
+
+.session-summary:focus {
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 .session-main-info {
@@ -394,6 +414,17 @@ textarea:focus {
     font-size: 1.2rem;
     color: #444;
     transition: color 0.1s;
+    outline: none;
+    display: inline-block;
+}
+
+.star:focus {
+    color: #666;
+}
+
+.star:focus-visible {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 .star.active {

@@ -214,11 +214,22 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                                                     }
                                                 };
 
+                                                let on_summary_click = move |_| toggle_expand(s_id);
+                                                let on_summary_keydown = move |ev: leptos::ev::KeyboardEvent| {
+                                                    if ev.key() == "Enter" || ev.key() == " " {
+                                                        ev.prevent_default();
+                                                        toggle_expand(s_id);
+                                                    }
+                                                };
+
                                                 view! {
                                                     <div class="session-item-container" class:expanded=is_expanded>
                                                         <div
                                                             class="session-summary"
-                                                            on:click=move |_| toggle_expand(s_id)
+                                                            role="button"
+                                                            tabindex="0"
+                                                            on:click=on_summary_click
+                                                            on:keydown=on_summary_keydown
                                                         >
                                                             <div class="session-main-info">
                                                                 <span class="session-time">{move || s_stored.get_value().start}</span>
@@ -478,7 +489,15 @@ fn RatingInput(
                         <span
                             class="star"
                             class:active=is_active
+                            role="button"
+                            tabindex="0"
                             on:click=move |_| set_value.set(i)
+                            on:keydown={move |ev: leptos::ev::KeyboardEvent| {
+                                if ev.key() == "Enter" || ev.key() == " " {
+                                    ev.prevent_default();
+                                    set_value.set(i);
+                                }
+                            }}
                         >
                             "★"
                         </span>

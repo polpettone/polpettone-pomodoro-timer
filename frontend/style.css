@@ -263,6 +263,35 @@ th {
     margin-bottom: 1rem;
 }
 
+/* Navigation Tabs */
+.nav-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.nav-btn {
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: #888;
+    padding: 0.5rem 1.2rem;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.nav-btn:hover {
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-btn.active {
+    background-color: var(--accent-color);
+    color: white;
+    font-weight: bold;
+}
+
 .filter-preset-btn {
     padding: 0.3rem 0.7rem;
     font-size: 0.8rem;
@@ -307,6 +336,109 @@ th {
     font-size: 0.7rem;
     letter-spacing: 0.5px;
     color: #666;
+}
+
+/* Stats View Layout */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.stats-card {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 1.2rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.stats-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 1px;
+}
+
+.stats-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-row:last-child {
+    border-bottom: none;
+}
+
+.stats-desc-label {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.stats-list-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Timeline/Bar Chart */
+.stats-timeline {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 140px;
+    padding-top: 20px;
+    overflow-x: auto;
+}
+
+.timeline-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 25px;
+}
+
+.timeline-bar {
+    width: 100%;
+    background-color: var(--accent-color);
+    border-radius: 3px 3px 0 0;
+    position: relative;
+    min-height: 2px;
+}
+
+.timeline-count {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #888;
+}
+
+.timeline-count {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #888;
+}
+
+.timeline-date {
+    font-size: 0.65rem;
+    color: #666;
+    margin-top: 0.5rem;
 }
 
 /* Inline Editor & List Styles */

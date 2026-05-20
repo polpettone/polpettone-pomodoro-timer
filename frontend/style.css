@@ -523,7 +523,7 @@ th {
     border-radius: 8px;
     border: 1px solid var(--border-color);
     position: relative;
-    max-height: 600px;
+    max-height: 2700px;
     overflow-y: auto;
 }
 
@@ -536,7 +536,7 @@ th {
 }
 
 .time-mark {
-    height: 80px;
+    height: 320px;
     font-size: 0.7rem;
     color: #666;
     display: flex;
@@ -575,12 +575,12 @@ th {
 
 .calendar-day-body {
     position: relative;
-    height: 1920px; /* 24 hours * 80px */
+    height: 7680px; /* 24 hours * 320px */
     background-image: linear-gradient(
         rgba(255, 255, 255, 0.03) 1px,
         transparent 1px
     );
-    background-size: 100% 80px;
+    background-size: 100% 320px;
 }
 
 .calendar-session-block {

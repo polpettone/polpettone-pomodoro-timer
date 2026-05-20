@@ -243,9 +243,10 @@ pub fn Stats(token: String) -> impl IntoView {
                                                             <div class="calendar-day-header">{day_name}</div>
                                                             <div class="calendar-day-body">
                                                                 {sessions.into_iter().map(|s| {
-                                                                    let (h, m) = extract_time_parts(&s.start);
-                                                                    let top = (h as f32 * 80.0) + (m as f32 / 60.0 * 80.0);
-                                                                    let height = (s.duration.secs as f32 / 3600.0 * 80.0).max(25.0);
+                                                                    let local_start = convert_to_local_string(&s.start);
+                                                                    let (h, m) = extract_time_parts(&local_start);
+                                                                    let top = (h as f32 * 320.0) + (m as f32 / 60.0 * 320.0);
+                                                                    let height = (s.duration.secs as f32 / 3600.0 * 320.0).max(40.0);
                                                                     view! {
                                                                         <div class="calendar-session-block" style=format!("top: {}px; height: {}px", top, height)>
                                                                             <span class="session-block-desc">{s.description}</span>
@@ -300,4 +301,14 @@ fn extract_time_parts(start: &str) -> (usize, usize) {
     let h = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
     let m = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
     (h, m)
+}
+
+fn convert_to_local_string(utc_start: &str) -> String {
+    use chrono::TimeZone;
+    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(utc_start, "%Y-%m-%d %H:%M:%S") {
+        let utc_dt = Utc.from_utc_datetime(&naive);
+        let local_dt: chrono::DateTime<chrono::Local> = utc_dt.with_timezone(&chrono::Local);
+        return local_dt.format("%Y-%m-%d %H:%M:%S").to_string();
+    }
+    utc_start.to_string()
 }

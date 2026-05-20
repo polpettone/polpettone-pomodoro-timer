@@ -37,6 +37,10 @@ pub enum Command {
         #[structopt(short = "n", long = "number", default_value = "50")]
         number: u32,
     },
+    Import {
+        #[structopt(short = "d", long = "directory")]
+        directory: String,
+    },
     Server {
         #[structopt(short = "h", long = "host", default_value = "127.0.0.1")]
         host: String,

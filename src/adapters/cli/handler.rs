@@ -6,10 +6,13 @@ use crate::adapters::tui::app::App;
 use crate::application::auth_service::AuthService;
 use crate::application::service::SessionService;
 use crate::domain::repository::SessionRepository;
-use crate::domain::session::{Session, SessionState};
-use chrono::{Duration as ChronoDuration, NaiveDateTime, Utc};
+use crate::domain::session::{Session, SessionRatings, SessionState};
+use chrono::{DateTime, Duration as ChronoDuration, NaiveDateTime, Utc};
 use rand::Rng;
+use serde::Deserialize;
 use std::error::Error;
+use std::fs;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 use uuid::Uuid;
@@ -72,6 +75,9 @@ pub async fn handle_command<R: SessionRepository + Send + Sync + 'static + Clone
         }
         Command::GenerateTestData { number } => {
             handle_generate_test_data(user_id, session_service, number).await?;
+        }
+        Command::Import { directory } => {
+            handle_import(user_id, session_service, directory).await?;
         }
         Command::Server { host, port } => {
             handle_server(session_service, auth_service, host, port).await?;
@@ -338,5 +344,80 @@ async fn handle_generate_test_data<R: SessionRepository>(
         session_service.save_session(&session).await?;
     }
     println!("Done.");
+    Ok(())
+}
+
+async fn handle_import<R: SessionRepository>(
+    user_id: Uuid,
+    session_service: &SessionService<R>,
+    directory: String,
+) -> Result<(), Box<dyn Error>> {
+    let path = Path::new(&directory);
+    if !path.is_dir() {
+        return Err(format!("'{}' is not a directory", directory).into());
+    }
+
+    println!("Importing sessions from {}...", directory);
+
+    let mut imported_count = 0;
+    let mut error_count = 0;
+
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let file_path = entry.path();
+
+        if file_path.is_file() {
+            let content = fs::read_to_string(&file_path)?;
+
+            #[derive(Deserialize)]
+            struct ImportSession {
+                description: String,
+                duration: Duration,
+                #[serde(deserialize_with = "crate::date_time::deserialize_human_readable")]
+                start: DateTime<Utc>,
+                #[serde(default)]
+                tags: Vec<String>,
+                #[serde(default)]
+                notes: String,
+                #[serde(default = "default_state")]
+                state: SessionState,
+                #[serde(default)]
+                ratings: Option<SessionRatings>,
+            }
+
+            fn default_state() -> SessionState {
+                SessionState::Done
+            }
+
+            match serde_yaml::from_str::<ImportSession>(&content) {
+                Ok(import_session) => {
+                    let session = Session {
+                        id: Uuid::new_v4(),
+                        user_id,
+                        description: import_session.description,
+                        duration: import_session.duration,
+                        start: import_session.start,
+                        tags: import_session.tags,
+                        notes: import_session.notes,
+                        state: import_session.state,
+                        ratings: import_session.ratings,
+                    };
+
+                    session_service.save_session(&session).await?;
+                    imported_count += 1;
+                }
+                Err(e) => {
+                    eprintln!("Error parsing file {:?}: {}", file_path, e);
+                    error_count += 1;
+                }
+            }
+        }
+    }
+
+    println!(
+        "Import finished. {} sessions imported, {} errors.",
+        imported_count, error_count
+    );
+
     Ok(())
 }

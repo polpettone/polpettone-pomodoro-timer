@@ -536,7 +536,7 @@ th {
 }
 
 .time-mark {
-    height: 40px;
+    height: 80px;
     font-size: 0.7rem;
     color: #666;
     display: flex;
@@ -575,12 +575,12 @@ th {
 
 .calendar-day-body {
     position: relative;
-    height: 960px; /* 24 hours * 40px */
+    height: 1920px; /* 24 hours * 80px */
     background-image: linear-gradient(
         rgba(255, 255, 255, 0.03) 1px,
         transparent 1px
     );
-    background-size: 100% 40px;
+    background-size: 100% 80px;
 }
 
 .calendar-session-block {

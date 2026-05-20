@@ -244,8 +244,8 @@ pub fn Stats(token: String) -> impl IntoView {
                                                             <div class="calendar-day-body">
                                                                 {sessions.into_iter().map(|s| {
                                                                     let (h, m) = extract_time_parts(&s.start);
-                                                                    let top = (h as f32 * 40.0) + (m as f32 / 60.0 * 40.0);
-                                                                    let height = (s.duration.secs as f32 / 3600.0 * 40.0).max(20.0);
+                                                                    let top = (h as f32 * 80.0) + (m as f32 / 60.0 * 80.0);
+                                                                    let height = (s.duration.secs as f32 / 3600.0 * 80.0).max(25.0);
                                                                     view! {
                                                                         <div class="calendar-session-block" style=format!("top: {}px; height: {}px", top, height)>
                                                                             <span class="session-block-desc">{s.description}</span>

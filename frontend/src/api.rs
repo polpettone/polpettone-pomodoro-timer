@@ -41,6 +41,26 @@ pub async fn fetch_current_user(token: String) -> Result<User, String> {
     resp.json::<User>().await.map_err(|e| e.to_string())
 }
 
+pub async fn register(username: String, password: String) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "username": username,
+        "password": password,
+    });
+
+    let resp = Request::post(&format!("{}/register", API_BASE_URL))
+        .json(&payload)
+        .map_err(|e| e.to_string())?
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.ok() {
+        return Err(format!("Registrierung fehlgeschlagen: {}", resp.status()));
+    }
+
+    Ok(())
+}
+
 pub async fn fetch_all_sessions(token: String) -> Result<Vec<Session>, String> {
     let resp = Request::get(&format!(
         "{}/sessions?start=2000-01-01%2000:00:00&end=2099-12-31%2023:59:59",

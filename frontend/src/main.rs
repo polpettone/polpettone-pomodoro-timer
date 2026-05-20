@@ -7,6 +7,7 @@ use crate::api::fetch_active_sessions;
 use crate::auth::{clear_token_from_storage, get_token_from_storage, save_token_to_storage};
 use crate::components::active_sessions::ActiveSessions;
 use crate::components::all_sessions::AllSessions;
+use crate::components::evaluation::Evaluation;
 use crate::components::login::Login;
 use crate::components::start_session::StartSession;
 use crate::components::stats::Stats;
@@ -55,6 +56,12 @@ fn App() -> impl IntoView {
                             >
                                 "Statistiken"
                             </button>
+                            <button
+                                class=move || if view_mode.get() == "evaluation" { "nav-btn active" } else { "nav-btn" }
+                                on:click=move |_| set_view_mode.set("evaluation")
+                            >
+                                "Auswertung"
+                            </button>
                         </div>
 
                         {move || match view_mode.get() {
@@ -81,6 +88,11 @@ fn App() -> impl IntoView {
                             "stats" => view! {
                                 <section class="card">
                                     <Stats token=t_stored.get_value() />
+                                </section>
+                            }.into_view(),
+                            "evaluation" => view! {
+                                <section class="card">
+                                    <Evaluation token=t_stored.get_value() />
                                 </section>
                             }.into_view(),
                             _ => view! { <div/> }.into_view()

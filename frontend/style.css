@@ -686,3 +686,105 @@ textarea:focus {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Evaluation View */
+.evaluation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.evaluation-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+    border-left-width: 6px;
+}
+
+.evaluation-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.evaluation-card-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #888;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.4rem;
+}
+
+.evaluation-title {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+.evaluation-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.tag-label {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+}
+
+.evaluation-notes {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.6rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.evaluation-notes strong {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 0.2rem;
+}
+
+.evaluation-notes p {
+    margin: 0;
+    color: #ccc;
+    white-space: pre-wrap;
+}
+
+.evaluation-ratings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-top: auto;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.rating-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.rating-label {
+    color: #888;
+}
+
+.rating-value {
+    font-weight: bold;
+    color: var(--accent-color);
+    background-color: rgba(255, 82, 82, 0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+}

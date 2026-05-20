@@ -102,6 +102,11 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
         set_end_date.set(format_date(Utc::now()));
     };
 
+    let set_filter_all = move |_| {
+        set_start_date.set("1970-01-01".to_string());
+        set_end_date.set(format_date(Utc::now()));
+    };
+
     view! {
         <div class="all-sessions">
             <button
@@ -144,6 +149,7 @@ pub fn AllSessions(token: String, #[prop(into)] on_update: Callback<()>) -> impl
                         </label>
                     </div>
                     <div class="flex gap-1 wrap">
+                        <button class="filter-preset-btn" on:click=set_filter_all>"Alle"</button>
                         <button class="filter-preset-btn" on:click=set_filter_today>"Heute"</button>
                         <button class="filter-preset-btn" on:click=set_filter_yesterday>"Gestern"</button>
                         <button class="filter-preset-btn" on:click=set_filter_last_week>"Letzte 7 Tage"</button>

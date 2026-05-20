@@ -1,5 +1,5 @@
-use crate::api::API_BASE_URL;
-use crate::models::Session;
+use crate::api::{update_session, UpdateSessionRequest, API_BASE_URL};
+use crate::models::{Session, SessionRatings};
 use chrono::{Datelike, Duration, Utc};
 use gloo_net::http::Request;
 use leptos::*;
@@ -140,57 +140,12 @@ pub fn Evaluation(token: String) -> impl IntoView {
                             view! {
                                 <div class="evaluation-grid">
                                     {filtered.into_iter().map(|session| {
-                                        let ratings = session.ratings.clone().unwrap_or_default();
                                         view! {
-                                            <div class="session-card evaluation-card card">
-                                                <div class="evaluation-card-header">
-                                                    <span class="evaluation-date">{session.start.clone()}</span>
-                                                    <span class="evaluation-duration">{session.duration.secs / 60} "m"</span>
-                                                </div>
-                                                <h3 class="evaluation-title">{session.description.clone()}</h3>
-
-                                                {if !session.tags.is_empty() {
-                                                    view! {
-                                                        <div class="evaluation-tags">
-                                                            {session.tags.iter().map(|tag| {
-                                                                view! { <span class="tag-label">{tag}</span> }
-                                                            }).collect_view()}
-                                                        </div>
-                                                    }.into_view()
-                                                } else {
-                                                    view! { <div/> }.into_view()
-                                                }}
-
-                                                {if !session.notes.is_empty() {
-                                                    view! {
-                                                        <div class="evaluation-notes">
-                                                            <strong>"Notizen:"</strong>
-                                                            <p>{session.notes.clone()}</p>
-                                                        </div>
-                                                    }.into_view()
-                                                } else {
-                                                    view! { <div/> }.into_view()
-                                                }}
-
-                                                <div class="evaluation-ratings">
-                                                    <div class="rating-item">
-                                                        <span class="rating-label">"🧠 Mental:"</span>
-                                                        <span class="rating-value">{ratings.mental_energy}</span>
-                                                    </div>
-                                                    <div class="rating-item">
-                                                        <span class="rating-label">"💪 Physisch:"</span>
-                                                        <span class="rating-value">{ratings.physical_energy}</span>
-                                                    </div>
-                                                    <div class="rating-item">
-                                                        <span class="rating-label">"⚙️ Kognitiv:"</span>
-                                                        <span class="rating-value">{ratings.cognitive_load}</span>
-                                                    </div>
-                                                    <div class="rating-item">
-                                                        <span class="rating-label">"🔥 Motivation:"</span>
-                                                        <span class="rating-value">{ratings.motivation}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <EvaluationCard
+                                                token=token.get_value()
+                                                session=session
+                                                on_updated=move |_| { sessions_resource.refetch(); }
+                                            />
                                         }
                                     }).collect_view()}
                                 </div>
@@ -200,6 +155,145 @@ pub fn Evaluation(token: String) -> impl IntoView {
                     })
                 }}
             </Transition>
+        </div>
+    }
+}
+
+#[component]
+fn EvaluationCard(
+    token: String,
+    session: Session,
+    #[prop(into)] on_updated: Callback<()>,
+) -> impl IntoView {
+    let (description, set_description) = create_signal(session.description.clone());
+    let (tags_str, set_tags_str) = create_signal(session.tags.join(", "));
+    let (notes, set_notes) = create_signal(session.notes.clone());
+
+    let ratings = session.ratings.unwrap_or_default();
+    let (mental, set_mental) = create_signal(ratings.mental_energy);
+    let (physical, set_physical) = create_signal(ratings.physical_energy);
+    let (cognitive, set_cognitive) = create_signal(ratings.cognitive_load);
+    let (motivation, set_motivation) = create_signal(ratings.motivation);
+
+    let (is_saving, set_is_saving) = create_signal(false);
+
+    let handle_save = move |_| {
+        set_is_saving.set(true);
+        let t = token.clone();
+        let id = session.id;
+
+        let tag_list: Vec<String> = tags_str
+            .get()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let payload = UpdateSessionRequest {
+            description: Some(description.get()),
+            tags: Some(tag_list),
+            notes: Some(notes.get()),
+            ratings: Some(SessionRatings {
+                mental_energy: mental.get(),
+                physical_energy: physical.get(),
+                cognitive_load: cognitive.get(),
+                motivation: motivation.get(),
+            }),
+            state: None,
+        };
+
+        spawn_local(async move {
+            if let Ok(_) = update_session(t, id, payload).await {
+                set_is_saving.set(false);
+                on_updated.call(());
+            } else {
+                set_is_saving.set(false);
+            }
+        });
+    };
+
+    view! {
+        <div class="session-card evaluation-card card">
+            <div class="evaluation-card-header">
+                <span class="evaluation-date">{session.start.clone()}</span>
+                <span class="evaluation-duration">{session.duration.secs / 60} "m"</span>
+            </div>
+
+            <input
+                type="text"
+                class="evaluation-title-input"
+                prop:value=description
+                on:input=move |ev| set_description.set(event_target_value(&ev))
+            />
+
+            <div class="evaluation-field">
+                <label>"Tags"</label>
+                <input
+                    type="text"
+                    class="evaluation-tags-input"
+                    prop:value=tags_str
+                    on:input=move |ev| set_tags_str.set(event_target_value(&ev))
+                    placeholder="tag1, tag2..."
+                />
+            </div>
+
+            <div class="evaluation-field">
+                <label>"Notizen"</label>
+                <textarea
+                    class="evaluation-notes-input"
+                    rows="2"
+                    prop:value=notes
+                    on:input=move |ev| set_notes.set(event_target_value(&ev))
+                ></textarea>
+            </div>
+
+            <div class="evaluation-ratings">
+                <RatingControl label="🧠" value=mental set_value=set_mental />
+                <RatingControl label="💪" value=physical set_value=set_physical />
+                <RatingControl label="⚙️" value=cognitive set_value=set_cognitive />
+                <RatingControl label="🔥" value=motivation set_value=set_motivation />
+            </div>
+
+            <button
+                class="save-btn evaluation-save-btn"
+                on:click=handle_save
+                disabled=is_saving
+            >
+                {move || if is_saving.get() { "..." } else { "Speichern" }}
+            </button>
+        </div>
+    }
+}
+
+#[component]
+fn RatingControl(
+    label: &'static str,
+    value: ReadSignal<u8>,
+    set_value: WriteSignal<u8>,
+) -> impl IntoView {
+    let inc = move |_| {
+        set_value.update(|v| {
+            if *v < 5 {
+                *v += 1
+            }
+        })
+    };
+    let dec = move |_| {
+        set_value.update(|v| {
+            if *v > 0 {
+                *v -= 1
+            }
+        })
+    };
+
+    view! {
+        <div class="rating-item">
+            <span class="rating-label">{label}</span>
+            <div class="rating-controls">
+                <button class="rating-btn" on:click=dec>"-"</button>
+                <span class="rating-value">{value}</span>
+                <button class="rating-btn" on:click=inc>"+"</button>
+            </div>
         </div>
     }
 }

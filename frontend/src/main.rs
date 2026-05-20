@@ -3,7 +3,7 @@ mod auth;
 mod components;
 mod models;
 
-use crate::api::fetch_active_sessions;
+use crate::api::{fetch_active_sessions, fetch_current_user};
 use crate::auth::{clear_token_from_storage, get_token_from_storage, save_token_to_storage};
 use crate::components::active_sessions::ActiveSessions;
 use crate::components::all_sessions::AllSessions;
@@ -42,9 +42,19 @@ fn App() -> impl IntoView {
                         {move || if is_wide.get() { "📱" } else { "🖥️" }}
                     </button>
                 </div>
-                {move || token.get().is_some().then(|| view! {
-                    <button class="logout-btn" on:click=logout>"Abmelden"</button>
-                })}
+                {move || {
+                    token.get().map(|t| {
+                        let user_resource = create_resource(move || t.clone(), fetch_current_user);
+                        view! {
+                            <div class="flex-col items-end gap-1">
+                                <span class="user-display">
+                                    {move || user_resource.get().and_then(|res| res.ok()).map(|u| u.username).unwrap_or_default()}
+                                </span>
+                                <button class="logout-btn" on:click=logout>"Abmelden"</button>
+                            </div>
+                        }
+                    })
+                }}
             </div>
 
             {move || match token.get() {

@@ -6,6 +6,7 @@ use crate::domain::user::{LoginRequest, LoginResponse, RegisterRequest};
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -71,6 +72,7 @@ pub fn create_router<R: SessionRepository + Send + Sync + 'static>(
     Router::new()
         .route("/login", post(login::<R>))
         .route("/register", post(register::<R>))
+        .route("/me", get(me::<R>))
         .route("/sessions/start", post(start_session::<R>))
         .route("/sessions/active", get(get_active_sessions::<R>))
         .route("/sessions", get(get_sessions::<R>))
@@ -121,6 +123,14 @@ async fn register<R: SessionRepository + Send + Sync + 'static>(
         .await
         .map(|_| StatusCode::CREATED)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+async fn me<R: SessionRepository + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<R>>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let user = check_auth(&state, &headers).await?;
+    Ok(Json(user))
 }
 
 async fn check_auth<R: SessionRepository>(

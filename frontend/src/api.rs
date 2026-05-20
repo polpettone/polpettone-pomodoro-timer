@@ -1,4 +1,4 @@
-use crate::models::{Session, SessionRatings};
+use crate::models::{Session, SessionRatings, User};
 use gloo_net::http::Request;
 use serde::Serialize;
 
@@ -22,6 +22,23 @@ pub async fn fetch_active_sessions(token: String) -> Result<Vec<Session>, String
     }
 
     resp.json::<Vec<Session>>().await.map_err(|e| e.to_string())
+}
+
+pub async fn fetch_current_user(token: String) -> Result<User, String> {
+    let resp = Request::get(&format!("{}/me", API_BASE_URL))
+        .header("Authorization", &format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.ok() {
+        return Err(format!(
+            "Fehler beim Laden des Benutzers: {}",
+            resp.status()
+        ));
+    }
+
+    resp.json::<User>().await.map_err(|e| e.to_string())
 }
 
 pub async fn fetch_all_sessions(token: String) -> Result<Vec<Session>, String> {

@@ -214,6 +214,11 @@ th {
 .logout-btn:hover {
     background-color: var(--accent-color);
 }
+.user-display {
+    font-size: 0.85rem;
+    color: #888;
+    font-weight: bold;
+}
 .login-form {
     max-width: 400px;
     margin: 0 auto;
@@ -221,6 +226,9 @@ th {
 .flex-col {
     display: flex;
     flex-direction: column;
+}
+.items-end {
+    align-items: flex-end;
 }
 .gap-2 {
     gap: 0.5rem;

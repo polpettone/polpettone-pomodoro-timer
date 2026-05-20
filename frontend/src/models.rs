@@ -28,3 +28,9 @@ pub struct Session {
     pub state: String,
     pub ratings: Option<SessionRatings>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct User {
+    pub id: Uuid,
+    pub username: String,
+}

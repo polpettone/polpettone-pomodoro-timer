@@ -515,6 +515,96 @@ th {
     height: 10px;
 }
 
+/* Calendar View Styles */
+.calendar-view {
+    display: flex;
+    overflow-x: auto;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.calendar-time-axis {
+    width: 60px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    background-color: rgba(0, 0, 0, 0.3);
+    padding-top: 40px; /* Header offset */
+}
+
+.time-mark {
+    height: 40px;
+    font-size: 0.7rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.calendar-days {
+    display: flex;
+    flex-grow: 1;
+}
+
+.calendar-day-col {
+    flex: 1;
+    min-width: 150px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-day-header {
+    height: 40px;
+    background-color: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.calendar-day-body {
+    position: relative;
+    height: 960px; /* 24 hours * 40px */
+    background-image: linear-gradient(
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+    );
+    background-size: 100% 40px;
+}
+
+.calendar-session-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    background-color: var(--accent-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    color: white;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border-left: 3px solid rgba(255, 255, 255, 0.3);
+    z-index: 2;
+}
+
+.session-block-desc {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .timeline-item {
     display: flex;
     flex-direction: column;

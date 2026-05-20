@@ -149,16 +149,24 @@ pub fn Stats(token: String) -> impl IntoView {
                             let mut desc_counts_vec: Vec<_> = desc_counts.into_iter().collect();
                             desc_counts_vec.sort_by(|a, b| b.1.cmp(&a.1));
 
-                            // 2. Day Heatmap Data
+                            // 2. Heatmap & Calendar Data
                             let mut day_activity: HashMap<String, [usize; 24]> = HashMap::new();
+                            let mut day_sessions: HashMap<String, Vec<Session>> = HashMap::new();
                             for s in &filtered {
                                 let date = extract_date_from_start(&s.start);
                                 let hour = extract_hour_from_start(&s.start);
-                                let entry = day_activity.entry(date).or_insert([0; 24]);
-                                entry[hour] += 1;
+
+                                let activity = day_activity.entry(date.clone()).or_insert([0; 24]);
+                                activity[hour] += 1;
+
+                                let sessions = day_sessions.entry(date).or_insert(Vec::new());
+                                sessions.push(s.clone());
                             }
                             let mut sorted_days: Vec<_> = day_activity.into_iter().collect();
                             sorted_days.sort_by(|a, b| b.0.cmp(&a.0)); // Neueste zuerst
+
+                            let mut sorted_days_full: Vec<_> = day_sessions.into_iter().collect();
+                            sorted_days_full.sort_by(|a, b| b.0.cmp(&a.0));
 
                             view! {
                                 <div class="stats-grid">
@@ -219,13 +227,36 @@ pub fn Stats(token: String) -> impl IntoView {
                                                 }).collect_view()}
                                             </div>
                                         </div>
-                                        <div class="heatmap-legend">
-                                            <span>"Weniger"</span>
-                                            <div class="heatmap-cell empty"></div>
-                                            <div class="heatmap-cell low"></div>
-                                            <div class="heatmap-cell medium"></div>
-                                            <div class="heatmap-cell high"></div>
-                                            <span>"Mehr"</span>
+                                    </div>
+
+                                    <div class="stats-card full-width">
+                                        <h3>"Detaillierter Verlauf"</h3>
+                                        <div class="calendar-view">
+                                            <div class="calendar-time-axis">
+                                                {(0..24).map(|h| view! { <div class="time-mark">{format!("{:02}:00", h)}</div> }).collect_view()}
+                                            </div>
+                                            <div class="calendar-days">
+                                                {sorted_days_full.into_iter().take(7).map(|(date, sessions)| {
+                                                    let day_name = date.split('-').skip(1).collect::<Vec<_>>().join(".");
+                                                    view! {
+                                                        <div class="calendar-day-col">
+                                                            <div class="calendar-day-header">{day_name}</div>
+                                                            <div class="calendar-day-body">
+                                                                {sessions.into_iter().map(|s| {
+                                                                    let (h, m) = extract_time_parts(&s.start);
+                                                                    let top = (h as f32 * 40.0) + (m as f32 / 60.0 * 40.0);
+                                                                    let height = (s.duration.secs as f32 / 3600.0 * 40.0).max(20.0);
+                                                                    view! {
+                                                                        <div class="calendar-session-block" style=format!("top: {}px; height: {}px", top, height)>
+                                                                            <span class="session-block-desc">{s.description}</span>
+                                                                        </div>
+                                                                    }
+                                                                }).collect_view()}
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }).collect_view()}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -261,4 +292,12 @@ fn extract_hour_from_start(start: &str) -> usize {
         .and_then(|t| t.split(':').next())
         .and_then(|h| h.parse().ok())
         .unwrap_or(0)
+}
+
+fn extract_time_parts(start: &str) -> (usize, usize) {
+    let time_part = start.split(' ').nth(1).unwrap_or("00:00:00");
+    let mut parts = time_part.split(':');
+    let h = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+    let m = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+    (h, m)
 }

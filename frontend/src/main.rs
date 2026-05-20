@@ -22,6 +22,7 @@ fn main() {
 fn App() -> impl IntoView {
     let (token, set_token) = create_signal(get_token_from_storage());
     let (view_mode, set_view_mode) = create_signal("timer");
+    let (is_wide, set_is_wide) = create_signal(false);
 
     let logout = move |_| {
         clear_token_from_storage();
@@ -29,9 +30,18 @@ fn App() -> impl IntoView {
     };
 
     view! {
-        <main class="container">
+        <main class="container" class:wide-layout=is_wide>
             <div class="header-flex">
-                <h1>"Polpettone Pomodoro Timer"</h1>
+                <div class="flex items-center gap-2">
+                    <h1>"Polpettone Pomodoro Timer"</h1>
+                    <button
+                        class="filter-preset-btn"
+                        title=move || if is_wide.get() { "Kompaktansicht" } else { "Vollbildansicht" }
+                        on:click=move |_| set_is_wide.update(|v| *v = !*v)
+                    >
+                        {move || if is_wide.get() { "📱" } else { "🖥️" }}
+                    </button>
+                </div>
                 {move || token.get().is_some().then(|| view! {
                     <button class="logout-btn" on:click=logout>"Abmelden"</button>
                 })}

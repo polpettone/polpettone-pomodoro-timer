@@ -426,6 +426,95 @@ th {
     overflow-x: auto;
 }
 
+/* Heatmap Styles */
+.heatmap-container {
+    overflow-x: auto;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.heatmap-header {
+    display: flex;
+    margin-bottom: 4px;
+}
+
+.heatmap-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.heatmap-row {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+
+.day-label {
+    width: 50px;
+    font-size: 0.7rem;
+    color: #666;
+    text-align: right;
+    margin-right: 8px;
+}
+
+.day-label-empty {
+    width: 58px;
+}
+
+.hour-label {
+    width: 14px;
+    font-size: 0.6rem;
+    color: #666;
+    text-align: center;
+    margin-right: 2px;
+}
+
+.heatmap-cell {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    transition: transform 0.1s;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.2);
+    z-index: 10;
+}
+
+.heatmap-cell.empty {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.heatmap-cell.low {
+    background-color: #ffdada; /* Sehr helles rot */
+}
+
+.heatmap-cell.medium {
+    background-color: #ff7b7b; /* Mittleres rot */
+}
+
+.heatmap-cell.high {
+    background-color: var(--accent-color); /* Kräftiges rot */
+}
+
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: flex-end;
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.heatmap-legend .heatmap-cell {
+    width: 10px;
+    height: 10px;
+}
+
 .timeline-item {
     display: flex;
     flex-direction: column;

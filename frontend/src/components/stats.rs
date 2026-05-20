@@ -141,7 +141,7 @@ pub fn Stats(token: String) -> impl IntoView {
 
                             let (total_count, total_minutes, avg_minutes) = calculate_stats(&filtered);
 
-                            // 2. Count by Description
+                            // 1. Top Description
                             let mut desc_counts: HashMap<String, usize> = HashMap::new();
                             for s in &filtered {
                                 *desc_counts.entry(s.description.clone()).or_insert(0) += 1;
@@ -149,14 +149,16 @@ pub fn Stats(token: String) -> impl IntoView {
                             let mut desc_counts_vec: Vec<_> = desc_counts.into_iter().collect();
                             desc_counts_vec.sort_by(|a, b| b.1.cmp(&a.1));
 
-                            // 3. Sessions per Day
-                            let mut day_counts: HashMap<String, usize> = HashMap::new();
+                            // 2. Day Heatmap Data
+                            let mut day_activity: HashMap<String, [usize; 24]> = HashMap::new();
                             for s in &filtered {
-                                let date_part = extract_date_from_start(&s.start);
-                                *day_counts.entry(date_part).or_insert(0) += 1;
+                                let date = extract_date_from_start(&s.start);
+                                let hour = extract_hour_from_start(&s.start);
+                                let entry = day_activity.entry(date).or_insert([0; 24]);
+                                entry[hour] += 1;
                             }
-                            let mut day_counts_vec: Vec<_> = day_counts.into_iter().collect();
-                            day_counts_vec.sort_by(|a, b| a.0.cmp(&b.0));
+                            let mut sorted_days: Vec<_> = day_activity.into_iter().collect();
+                            sorted_days.sort_by(|a, b| b.0.cmp(&a.0)); // Neueste zuerst
 
                             view! {
                                 <div class="stats-grid">
@@ -191,20 +193,39 @@ pub fn Stats(token: String) -> impl IntoView {
                                     </div>
 
                                     <div class="stats-card full-width">
-                                        <h3>"Verlauf (Sessions pro Tag)"</h3>
-                                        <div class="stats-timeline">
-                                            {day_counts_vec.into_iter().map(|(date, count)| {
-                                                let height = (count as f32 * 20.0).min(100.0);
-                                                let day = date.split('-').last().unwrap_or("").to_string();
-                                                view! {
-                                                    <div class="timeline-item">
-                                                        <div class="timeline-bar" style=format!("height: {}px", height)>
-                                                            <span class="timeline-count">{count}</span>
+                                        <h3>"Aktivitäts-Heatmap (Tag / Stunde)"</h3>
+                                        <div class="heatmap-container">
+                                            <div class="heatmap-header">
+                                                <span class="day-label-empty"></span>
+                                                {(0..24).map(|h| view! { <span class="hour-label">{format!("{:02}", h)}</span> }).collect_view()}
+                                            </div>
+                                            <div class="heatmap-grid">
+                                                {sorted_days.into_iter().map(|(date, hours)| {
+                                                    let day_display = date.split('-').skip(1).collect::<Vec<_>>().join(".");
+                                                    view! {
+                                                        <div class="heatmap-row">
+                                                            <span class="day-label">{day_display}</span>
+                                                            {hours.into_iter().map(|count| {
+                                                                let intensity = if count == 0 { "empty" }
+                                                                               else if count == 1 { "low" }
+                                                                               else if count == 2 { "medium" }
+                                                                               else { "high" };
+                                                                view! {
+                                                                    <div class=format!("heatmap-cell {}", intensity) title=format!("{}: {} Sessions", date, count)></div>
+                                                                }
+                                                            }).collect_view()}
                                                         </div>
-                                                        <span class="timeline-date">{day}</span>
-                                                    </div>
-                                                }
-                                            }).collect_view()}
+                                                    }
+                                                }).collect_view()}
+                                            </div>
+                                        </div>
+                                        <div class="heatmap-legend">
+                                            <span>"Weniger"</span>
+                                            <div class="heatmap-cell empty"></div>
+                                            <div class="heatmap-cell low"></div>
+                                            <div class="heatmap-cell medium"></div>
+                                            <div class="heatmap-cell high"></div>
+                                            <span>"Mehr"</span>
                                         </div>
                                     </div>
                                 </div>
@@ -231,4 +252,13 @@ fn calculate_stats(sessions: &[Session]) -> (usize, u64, u64) {
 
 fn extract_date_from_start(start: &str) -> String {
     start.split(' ').next().unwrap_or("?").to_string()
+}
+
+fn extract_hour_from_start(start: &str) -> usize {
+    start
+        .split(' ')
+        .nth(1)
+        .and_then(|t| t.split(':').next())
+        .and_then(|h| h.parse().ok())
+        .unwrap_or(0)
 }

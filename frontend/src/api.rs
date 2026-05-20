@@ -55,7 +55,11 @@ pub async fn register(username: String, password: String) -> Result<(), String> 
         .map_err(|e| e.to_string())?;
 
     if !resp.ok() {
-        return Err(format!("Registrierung fehlgeschlagen: {}", resp.status()));
+        let error_msg = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "Registrierung fehlgeschlagen".to_string());
+        return Err(error_msg);
     }
 
     Ok(())

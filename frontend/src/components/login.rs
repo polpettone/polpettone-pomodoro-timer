@@ -28,7 +28,11 @@ pub fn Login(#[prop(into)] on_login: Callback<String>) -> impl IntoView {
                 .map_err(|e| e.to_string())?;
 
             if !resp.ok() {
-                return Err("Login fehlgeschlagen. Überprüfen Sie Ihre Zugangsdaten.".to_string());
+                let error_text = resp
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Login fehlgeschlagen".to_string());
+                return Err(error_text);
             }
 
             let data = resp

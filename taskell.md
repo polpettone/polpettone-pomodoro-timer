@@ -1,14 +1,15 @@
 ## To Do
 
-- register page
 - load tests
 - e2e tests
-- code review
+- code review 1
+- admin area
 
 ## Doing
 
 ## Done
 
+- register page
 - logging
 - statistik Zeile
 - user -> sessions

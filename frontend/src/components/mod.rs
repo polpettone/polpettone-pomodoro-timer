@@ -1,4 +1,5 @@
 pub mod active_sessions;
+pub mod admin_view;
 pub mod all_sessions;
 pub mod evaluation;
 pub mod login;

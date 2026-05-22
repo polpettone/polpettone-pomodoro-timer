@@ -222,4 +222,23 @@ impl UserRepository for PostgresRepository {
             Ok::<(), Box<dyn Error>>(())
         })
     }
+
+    fn find_all(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<User>, Box<dyn Error>>> + Send + '_>> {
+        let pool = self.pool.clone();
+        Box::pin(async move {
+            let rows = sqlx::query("SELECT data FROM users ORDER BY username ASC")
+                .fetch_all(&pool)
+                .await?;
+
+            let mut users = Vec::new();
+            for row in rows {
+                let data: serde_json::Value = row.get("data");
+                let user: User = serde_json::from_value(data)?;
+                users.push(user);
+            }
+            Ok::<Vec<User>, Box<dyn Error>>(users)
+        })
+    }
 }

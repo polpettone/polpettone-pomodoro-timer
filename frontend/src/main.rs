@@ -6,6 +6,7 @@ mod models;
 use crate::api::{fetch_active_sessions, fetch_current_user};
 use crate::auth::{clear_token_from_storage, get_token_from_storage, save_token_to_storage};
 use crate::components::active_sessions::ActiveSessions;
+use crate::components::admin_view::AdminView;
 use crate::components::all_sessions::AllSessions;
 use crate::components::evaluation::Evaluation;
 use crate::components::login::Login;
@@ -59,7 +60,8 @@ fn App() -> impl IntoView {
 
             {move || match token.get() {
                 Some(t) => {
-                    let t_stored = store_value(t);
+                    let t_stored = store_value(t.clone());
+                    let user_resource = create_resource(move || t.clone(), fetch_current_user);
                     let sessions = create_resource(move || t_stored.get_value(), |t| fetch_active_sessions(t));
 
                     view! {
@@ -82,6 +84,19 @@ fn App() -> impl IntoView {
                             >
                                 "Auswertung"
                             </button>
+                            <Show when=move || {
+                                user_resource.get()
+                                    .and_then(|res| res.ok())
+                                    .map(|u| u.username == "admin")
+                                    .unwrap_or(false)
+                            }>
+                                <button
+                                    class=move || if view_mode.get() == "admin" { "nav-btn active" } else { "nav-btn" }
+                                    on:click=move |_| set_view_mode.set("admin")
+                                >
+                                    "Admin"
+                                </button>
+                            </Show>
                         </div>
 
                         {move || match view_mode.get() {
@@ -113,6 +128,11 @@ fn App() -> impl IntoView {
                             "evaluation" => view! {
                                 <section class="card">
                                     <Evaluation token=t_stored.get_value() />
+                                </section>
+                            }.into_view(),
+                            "admin" => view! {
+                                <section class="card">
+                                    <AdminView token=t_stored.get_value() />
                                 </section>
                             }.into_view(),
                             _ => view! { <div/> }.into_view()

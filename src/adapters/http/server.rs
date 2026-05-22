@@ -73,6 +73,7 @@ pub fn create_router<R: SessionRepository + Send + Sync + 'static>(
         .route("/login", post(login::<R>))
         .route("/register", post(register::<R>))
         .route("/me", get(me::<R>))
+        .route("/users", get(get_users::<R>))
         .route("/sessions/start", post(start_session::<R>))
         .route("/sessions/active", get(get_active_sessions::<R>))
         .route("/sessions", get(get_sessions::<R>))
@@ -131,6 +132,28 @@ async fn me<R: SessionRepository + Send + Sync + 'static>(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let user = check_auth(&state, &headers).await?;
     Ok(Json(user))
+}
+
+async fn get_users<R: SessionRepository + Send + Sync + 'static>(
+    State(state): State<Arc<AppState<R>>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let user = check_auth(&state, &headers).await?;
+
+    // Only admin can list all users
+    if user.username != "admin" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Only admin can access this resource".to_string(),
+        ));
+    }
+
+    state
+        .auth_service
+        .list_users()
+        .await
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 async fn check_auth<R: SessionRepository>(

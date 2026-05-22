@@ -41,6 +41,20 @@ pub async fn fetch_current_user(token: String) -> Result<User, String> {
     resp.json::<User>().await.map_err(|e| e.to_string())
 }
 
+pub async fn fetch_users(token: String) -> Result<Vec<User>, String> {
+    let resp = Request::get(&format!("{}/users", API_BASE_URL))
+        .header("Authorization", &format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.ok() {
+        return Err(format!("Fehler beim Laden der Benutzer: {}", resp.status()));
+    }
+
+    resp.json::<Vec<User>>().await.map_err(|e| e.to_string())
+}
+
 pub async fn register(username: String, password: String) -> Result<(), String> {
     let payload = serde_json::json!({
         "username": username,

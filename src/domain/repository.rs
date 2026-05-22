@@ -34,4 +34,7 @@ pub trait UserRepository {
         &self,
         user: &User,
     ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + Send + '_>>;
+    fn find_all(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<User>, Box<dyn Error>>> + Send + '_>>;
 }

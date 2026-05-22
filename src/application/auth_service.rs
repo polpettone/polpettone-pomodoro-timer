@@ -94,6 +94,10 @@ impl AuthService {
         Ok(())
     }
 
+    pub async fn list_users(&self) -> Result<Vec<User>, Box<dyn Error>> {
+        self.user_repository.find_all().await
+    }
+
     pub async fn validate_token(&self, token: &str) -> Option<User> {
         let validation = Validation::default();
         match decode::<Claims>(

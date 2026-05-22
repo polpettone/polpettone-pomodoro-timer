@@ -1,0 +1,116 @@
+---
+- name: Prepare Debian Server for Pomodoro App
+  hosts: servers
+  become: yes
+  vars:
+    deploy_user: deploy
+    ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - git
+          - ufw
+        state: present
+
+    - name: Ensure /etc/apt/keyrings exists
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create deployment user
+      user:
+        name: "{{ deploy_user }}"
+        shell: /bin/bash
+        groups: docker,sudo
+        append: yes
+
+    - name: Allow deploy user to use sudo without password
+      copy:
+        content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL"
+        dest: "/etc/sudoers.d/{{ deploy_user }}"
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Set authorized key for deploy user
+      authorized_key:
+        user: "{{ deploy_user }}"
+        state: present
+        key: "{{ ssh_public_key }}"
+
+    - name: SSH Hardening - Disable Root Login and Password Auth
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: "^PermitRootLogin", line: "PermitRootLogin no" }
+        - {
+            regexp: "^PasswordAuthentication",
+            line: "PasswordAuthentication no",
+          }
+        - { regexp: "^PubkeyAuthentication", line: "PubkeyAuthentication yes" }
+        - { regexp: "^X11Forwarding", line: "X11Forwarding no" }
+        - { regexp: "^MaxAuthTries", line: "MaxAuthTries 3" }
+      notify: Restart SSH
+
+    - name: Setup UFW Basic Firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22" # SSH
+        - "80" # HTTP
+        - "443" # HTTPS
+        - "3000" # Dein Backend Port
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted
